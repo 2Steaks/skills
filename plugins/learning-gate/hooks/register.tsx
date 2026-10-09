@@ -13,6 +13,8 @@
 // so a checkpoint Claude forgot to lock still holds. It never overwrites a lock.
 // It logs the mechanical events (triage, gate open/close, refusals) to
 // .learning/events.jsonl as "by":"mod"; the skill logs the judgement calls.
+// A checkpoint left open from an earlier session is parked, not enforced: the band
+// says so and /pickup resumes it (loading the skill). Nothing blocks until then.
 // A hook that fails is skipped: the gate fails open, never locking you out.
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
@@ -83,13 +85,14 @@ export const register: Register = on => {
       const file = target === undefined ? undefined : resolvePath(cwd, target)
       touchesRecord = file !== undefined && isInRecord(file)
 
-      if (!touchesRecord) {
+      // Opt-in: a lock only blocks once the skill is in play this session.
+      if (!touchesRecord && (await read($, activeState))) {
         const lock = await readLock($, file === undefined ? [cwd] : [parentOf(file), cwd])
         if (lock !== null) {
           await setLock($, lock)
           await logEvent($, { e: 'edit_refused', tier: lock.tier.toLowerCase(), label: lock.category, tool })
 
-          return { deny: blockMessage(lock, await read($, activeState)) }
+          return { deny: blockMessage(lock) }
         }
       }
     }
@@ -107,15 +110,15 @@ export const register: Register = on => {
 
   // Keep the open question in front of the model on every prompt.
   on('prompt.submit', async ($, e, next) => {
-    await update($, namedState, () => NAMES_SKILL.test(e.text))
+    const named = NAMES_SKILL.test(e.text)
+    await update($, namedState, () => named)
     const lock = await refresh($)
-    if (lock === null) return next(e)
-    const note = (await read($, activeState))
-      ? `Learning checkpoint open (${label(lock)}): "${lock.question}" ` +
-        'Read this message as the answer unless it plainly is not one, and judge it by the learning-guardrails evidence bar. ' +
-        `Code edits stay refused until the checkpoint closes: delete ${lock.path} only as the learning-guardrails skill allows.`
-      : `A learning checkpoint from an earlier learning-guardrails session is still open (${label(lock)}): "${lock.question}" ` +
-        'Code edits stay refused until it closes. Tell the user, and that /pickup continues it. Do not load the skill yourself.'
+    // Parked checkpoints stay quiet until the user opts back in.
+    if (lock === null || !(named || (await read($, activeState)))) return next(e)
+    const note =
+      `Learning checkpoint open (${label(lock)}): "${lock.question}" ` +
+      'Read this message as the answer unless it plainly is not one (a pickup request is not: re-ask the question in full), and judge it by the learning-guardrails evidence bar. ' +
+      `Code edits stay refused until the checkpoint closes: delete ${lock.path} only as the learning-guardrails skill allows.`
 
     return next({ ...e, context: [...(e.context ?? []), note] })
   }).catch(($, e, next) => next(e))
@@ -135,7 +138,7 @@ export const register: Register = on => {
       const last = found.at(-1)?.[0].trim()
       if (last !== undefined) {
         await update($, triageState, () => last)
-        showStatus($, await read($, lockState), last)
+        showStatus($, await read($, lockState), last, await read($, activeState))
       }
       for (const [, tier, what] of found) {
         await logEvent($, { e: 'triage', tier: (tier ?? '').toLowerCase(), what: (what ?? '').trim().slice(0, 80) })
@@ -153,6 +156,14 @@ export const register: Register = on => {
     if (lock === null || e.props.hasSurvey) return next(e)
     const { Box, Text } = $.ui.resolve(e)
 
+    if (!(await read($, activeState))) {
+      return (
+        <Text dimColor wrap="wrap">
+          ⏸ Paused checkpoint · {label(lock)} · /pickup to carry on
+        </Text>
+      )
+    }
+
     return (
       <Box flexDirection="column">
         <Text color="warning" bold>
@@ -167,16 +178,42 @@ export const register: Register = on => {
   on('command.run', { command: 'learned' }, async $ => ({ text: await learnedSummary($) }))
 
   on('command.run', { command: 'pickup' }, async $ => {
-    void $.prompt.submit({ text: PICKUP, asUser: true })
+    await optIn($)
+    void runSkill($, PICKUP)
 
     return {}
   })
 
   on('command.run', { command: 'audit' }, async $ => {
-    void $.prompt.submit({ text: AUDIT, asUser: true })
+    await optIn($)
+    void runSkill($, AUDIT)
 
     return {}
   })
+}
+
+// ---- opting in ----
+
+// /pickup and /audit are the user asking for the skill: let it load and enforce.
+async function optIn($: Engine): Promise<void> {
+  await update($, namedState, () => true)
+  await update($, activeState, () => true)
+  await refresh($)
+}
+
+// Load the skill the way the user would (/learning-guardrails <ask>), else ask in words.
+async function runSkill($: Engine, ask: string): Promise<void> {
+  try {
+    const found = (await $.command.list()).find(c => isThisSkill(c.name))
+    if (found !== undefined) {
+      await $.command.run({ command: found.name, args: ask })
+
+      return
+    }
+  } catch {
+    // fall through to a plain prompt
+  }
+  await $.prompt.submit({ text: ask, asUser: true })
 }
 
 // ---- the lock ----
@@ -206,7 +243,7 @@ async function setLock($: Engine, lock: GateLock | null): Promise<void> {
     if (before !== null && lock === null) $.ui.toast('Gate lifted. Carry on.')
   }
   await trackGate($, lock)
-  showStatus($, lock, await read($, triageState))
+  showStatus($, lock, await read($, triageState), await read($, activeState))
 }
 
 // Which gates are open, by lock path, kept across sessions: a lock seen again
@@ -246,8 +283,9 @@ async function trackGate($: Engine, lock: GateLock | null): Promise<void> {
   }
 }
 
-function showStatus($: Engine, lock: GateLock | null, triage: string | null): void {
-  $.ui.status(lock !== null ? `🛑 Checkpoint open · ${label(lock)}` : (triage ?? undefined))
+function showStatus($: Engine, lock: GateLock | null, triage: string | null, active: boolean): void {
+  if (lock !== null) $.ui.status(active ? `🛑 Checkpoint open · ${label(lock)}` : `⏸ Paused checkpoint · ${label(lock)}`)
+  else $.ui.status(triage ?? undefined)
 }
 
 export function parseLock(path: string, text: string): GateLock {
@@ -262,19 +300,13 @@ export function parseLock(path: string, text: string): GateLock {
 
 const label = (lock: GateLock) => [lock.tier, lock.category].filter(Boolean).join(' · ')
 
-const blockMessage = (lock: GateLock, active: boolean) =>
-  active
-    ? [
-        'Learning checkpoint open: code edits are refused until the user shows they understand.',
-        `Open question: ${lock.question}`,
-        'Re-ask the question in full and end your turn.',
-        `Close the checkpoint (delete ${lock.path}) only as the learning-guardrails skill allows. Never offer the user a way around it.`,
-      ].join('\n')
-    : [
-        'A learning checkpoint from an earlier learning-guardrails session is still open, so code edits are refused.',
-        `Open question: ${lock.question}`,
-        'Tell the user, and that /pickup continues it. Do not load the skill yourself, and never offer a way around it.',
-      ].join('\n')
+const blockMessage = (lock: GateLock) =>
+  [
+    'Learning checkpoint open: code edits are refused until the user shows they understand.',
+    `Open question: ${lock.question}`,
+    'Re-ask the question in full and end your turn.',
+    `Close the checkpoint (delete ${lock.path}) only as the learning-guardrails skill allows. Never offer the user a way around it.`,
+  ].join('\n')
 
 function editTarget(e: unknown): string | undefined {
   const input = e as { file_path?: unknown; notebook_path?: unknown }

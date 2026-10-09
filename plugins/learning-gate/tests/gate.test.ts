@@ -111,6 +111,7 @@ describe('the gate', () => {
 
   test('lock: a code edit is refused, with the open question', async ($, on) => {
     world(on, { [LOCK]: LOCK_LINE })
+    await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
     const ran = await $.tool.call(edit('/proj/src/a.ts'))
     expect(refusal(ran)).toContain(QUESTION)
     expect(refusal(ran)).toContain('learning-guardrails')
@@ -118,6 +119,7 @@ describe('the gate', () => {
 
   test('lock: Write, a relative path and a nested package are refused too', async ($, on) => {
     world(on, { [LOCK]: LOCK_LINE })
+    await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
     const write = await $.tool.call({ tool: 'Write', file_path: '/proj/src/new.ts', content: 'x' })
     expect(refusal(write)).toContain(QUESTION)
     expect(refusal(await $.tool.call(edit('src/a.ts')))).toContain(QUESTION)
@@ -126,6 +128,7 @@ describe('the gate', () => {
 
   test('lock: a .. path cannot sneak out through .learning', async ($, on) => {
     world(on, { [LOCK]: LOCK_LINE })
+    await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
     const ran = await $.tool.call(edit('/proj/.learning/../src/a.ts'))
     expect(refusal(ran)).toContain(QUESTION)
   })
@@ -138,6 +141,7 @@ describe('the gate', () => {
 
   test('deleting the lock lifts the gate, with a toast', async ($, on) => {
     const { toasts, statuses } = world(on, { [LOCK]: LOCK_LINE })
+    await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
     expect(refusal(await $.tool.call(edit('/proj/src/a.ts')))).toContain(QUESTION)
     expect(statuses.at(-1)).toContain('Checkpoint open')
     await $.tool.call({ tool: 'Bash', command: 'rm -f .learning/gate.lock' })
@@ -150,6 +154,7 @@ describe('the gate', () => {
 describe('the mod logs the mechanical events', () => {
   test('gate open, a refused edit and gate close, with time open', async ($, on) => {
     const { files, clock } = world(on, { '/proj/.learning/session.md': '## Now' })
+    await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
     await $.tool.call({ tool: 'Write', file_path: LOCK, content: LOCK_LINE })
     await $.tool.call(edit('/proj/src/a.ts'))
     await clock.advance(30_000)
@@ -282,15 +287,53 @@ describe('opt-in', () => {
     expect(files.has(LOCK)).toBe(false)
   })
 
-  test('a lock left from an earlier session points to /pickup until the skill is called', async ($, on) => {
+  test('a lock left from an earlier session is parked: edits run, the band says /pickup', async ($, on) => {
+    const { statuses } = world(on, { [LOCK]: LOCK_LINE })
+    let context: readonly string[] | undefined
+    on('prompt.submit', ($, e) => {
+      context = e.context
+      return { text: e.text }
+    })
+    await $.prompt.submit(prompt('add a timeout'))
+    expect(context).toBeUndefined()
+    expect((await $.tool.call(edit('/proj/src/a.ts'))).deny).toBeUndefined()
+    expect(statuses.at(-1)).toContain('Paused checkpoint')
+    for (const surface of SURFACES) {
+      const ui = await $.ui.mount({ ...BAND, surface })
+      expect((await ui.find({ type: 'Text', text: 'Paused checkpoint' }))?.text).toContain('/pickup')
+      await ui.unmount()
+    }
+  })
+
+  test('/pickup loads the skill with the pickup ask, and the gate holds again', async ($, on) => {
     world(on, { [LOCK]: LOCK_LINE })
-    const before = refusal(await $.tool.call(edit('/proj/src/a.ts')))
-    expect(before).toContain('/pickup')
-    expect(before).toContain('Do not load the skill yourself')
-    await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
+    const ran: { command: string; args?: string }[] = []
+    on('command.list', () => ({ value: [{ name: 'learning-guardrails', description: 'x', source: 'skill' }] as never }))
+    on('command.run', { command: 'learning-guardrails' }, ($, e) => {
+      ran.push({ command: e.command, args: e.args })
+      return { text: '' }
+    })
+    await $.command.run(command('pickup'))
+    await new Promise(r => setTimeout(r, 0))
+    expect(ran).toHaveLength(1)
+    expect(ran[0]?.args).toContain('Pick up where we left off')
+    expect((await $.tool.call({ tool: 'Skill', skill: 'learning-guardrails' } as never)).deny).toBeUndefined()
     const after = refusal(await $.tool.call(edit('/proj/src/a.ts')))
     expect(after).toContain('Re-ask the question in full')
     expect(after).toContain(QUESTION)
+  })
+
+  test('/pickup falls back to a plain prompt when the skill command is missing', async ($, on) => {
+    world(on, { [LOCK]: LOCK_LINE })
+    const asked: string[] = []
+    on('command.list', () => ({ value: [] as never }))
+    on('prompt.submit', ($, e) => {
+      asked.push(e.text)
+      return { text: e.text }
+    })
+    await $.command.run(command('pickup'))
+    await new Promise(r => setTimeout(r, 0))
+    expect(asked.at(-1)).toContain('Pick up where we left off')
   })
 
   test('the standing rule says opt-in', async ($, on) => {
@@ -345,6 +388,7 @@ describe('keeping the question in front of everyone', () => {
       context = e.context
       return { text: e.text, context: e.context }
     })
+    await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
     await $.prompt.submit(prompt('two runs, because nothing cancels the first'))
     expect(context?.join('\n')).toContain(QUESTION)
   })
@@ -371,6 +415,7 @@ describe('keeping the question in front of everyone', () => {
   test('the band pins the question, then clears', async ($, on) => {
     const { files } = world(on, { [LOCK]: LOCK_LINE })
     on('prompt.submit', ($, e) => ({ text: e.text }))
+    await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
     await $.prompt.submit(prompt('loads the lock'))
     for (const surface of SURFACES) {
       const ui = await $.ui.mount({ ...BAND, surface })
