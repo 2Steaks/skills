@@ -1,0 +1,9 @@
+{
+  "name": "learning-gate",
+  "version": "0.3.0",
+  "description": "Enforces the opt-in learning-guardrails skill: keeps Claude from loading it unasked, blocks code edits while a checkpoint is open, pins the open question above the prompt, adds /learned, /pickup and /audit.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "2Steaks"
+  }
+}

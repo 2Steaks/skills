@@ -1,0 +1,21 @@
+{
+  "name": "2steaks-skills",
+  "description": "Skills and mods for Claude Code by 2Steaks.",
+  "owner": {
+    "name": "2Steaks"
+  },
+  "plugins": [
+    {
+      "name": "learning-guardrails",
+      "description": "Opt-in learning guardrails: call /learning-guardrails and it holds risky or new code until you show you understand it.",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/learning-guardrails"]
+    },
+    {
+      "name": "learning-gate",
+      "description": "Enforces learning-guardrails: keeps it opt-in, blocks code edits while a checkpoint is open and pins the open question above the prompt.",
+      "source": "./plugins/learning-gate"
+    }
+  ]
+}

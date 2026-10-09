@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "note": "Triage signals: candidate risk categories from changed file paths and changed lines. Claude's engagement judgement decides; these are the deterministic floor the benchmark tests. Changing them needs the user's yes.",
+  "categories": {
+    "data": {
+      "paths": ["(^|/)migrations?/", "\\.sql$", "\\.prisma$", "(^|/)schema\\.(ts|js|graphql)$"],
+      "diff": ["\\btransaction\\b", "\\bindexeddb\\b", "invalidateQueries|setQueryData|staleTime|cacheTime|gcTime", "\\bcache\\.(set|put|delete)\\("],
+      "diffExact": ["\\b(SELECT|INSERT INTO|UPDATE|DELETE FROM)\\b", "CREATE (UNIQUE )?INDEX", "ALTER TABLE", "\\bDROP (TABLE|COLUMN|INDEX)\\b"]
+    },
+    "concurrency": {
+      "paths": [],
+      "diff": ["Promise\\.(all|race|any|allSettled)\\b", "\\bAbortController\\b|\\.abort\\(\\)|\\bsignal\\s*[:,)}]", "\\bset(Timeout|Interval)\\(", "\\bretr(y|ies)\\b", "\\b(mutex|semaphore|queue)\\b", "\\bpoll(ing)?\\b", "\\bWebSocket\\b|\\bEventSource\\b", "\\bworker\\b"]
+    },
+    "security": {
+      "paths": ["(^|/)auth", "permission", "(^|/)security", "(^|/)middleware"],
+      "diff": ["dangerouslySetInnerHTML|\\.innerHTML\\s*=", "\\beval\\(|new Function\\(", "\\b(token|password|secret|api[_-]?key|credential)s?\\b", "\\b(cookie|csrf|cors)\\b|Content-Security-Policy", "\\bcrypto\\.subtle\\b|\\bjwt\\b", "\\b(role|permission)s?\\b"]
+    },
+    "performance": {
+      "paths": [],
+      "diff": ["\\buseMemo\\b|\\buseCallback\\b|React\\.memo\\b|\\bmemo\\(", "virtuali[sz]", "\\b(debounce|throttle)\\b", "requestAnimationFrame", "\\bN\\+1\\b", "\\.(map|filter|reduce)\\(.*\\.(map|filter|reduce)\\("]
+    },
+    "state": {
+      "paths": ["(^|/)(store|stores|context|contexts|state)/"],
+      "diff": ["\\buse(Layout)?Effect\\(", "\\bcreateContext\\(|\\buseContext\\(", "\\buseReducer\\(|\\bcreateSlice\\(|\\bzustand\\b|\\bredux\\b", "\\.subscribe\\(|addEventListener\\(", "\\b(local|session)Storage\\b", "\\buseSyncExternalStore\\b"]
+    },
+    "contracts": {
+      "paths": ["(^|/)api/", "openapi", "\\.proto$", "\\.d\\.ts$", "(^|/)types?/", "(^|/)package\\.json$"],
+      "diff": ["rm -rf|--force\\b|push -f\\b", "\\b(payment|billing|invoice)s?\\b"]
+    }
+  },
+  "go": { "commentOnly": true }
+}
