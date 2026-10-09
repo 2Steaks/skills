@@ -1,5 +1,5 @@
 import type { On } from 'claude-code'
-import { describe, expect, mock, test } from 'claude-code/testing'
+import { describe, expect, mock, test, type TestBody } from 'claude-code/testing'
 
 import { askedCheckpoint, clean, isInRecord, parseConcept, parseLock, summarise } from '../hooks/register'
 
@@ -71,6 +71,18 @@ function world(on: On, entries: Record<string, string> = {}, stored: Record<stri
 
 const events = (files: Map<string, string>, path = '/proj/.learning/events.jsonl') =>
   (files.get(path) ?? '').split('\n').filter(Boolean).map(line => JSON.parse(line) as Record<string, unknown>)
+
+// Appends a row through the plugin. The test kit can't store one: a test hook
+// that answers session.append is skipped (it must relay next), and next reaches
+// a bottom that throws. The plugin acts before its own next, so that one throw
+// is ignored; anything else still fails the test.
+const append = async ($: Parameters<TestBody>[0], row: never) => {
+  try {
+    await $.session.append(row)
+  } catch (error) {
+    if (!String(error).includes('no implementation for session.append')) throw error
+  }
+}
 
 const edit = (file_path: string) => ({ tool: 'Edit' as const, file_path, old_string: 'a', new_string: 'b' })
 const refusal = (ran: { deny?: string; text?: string }) => ran.deny ?? ''
@@ -154,7 +166,7 @@ describe('the mod logs the mechanical events', () => {
 
   test('a triage line is logged and shown in the status line', async ($, on) => {
     const { files, statuses } = world(on, { '/proj/.learning/session.md': '## Now' })
-    await $.session.append({
+    await append($, {
       message: { type: 'assistant', role: 'assistant', content: [{ type: 'text', text: 'Guardrail · CHECK · new to you: Intl.DurationFormat\n\nChecking…' }] },
       door: 'response',
       origin: { kind: 'model', model: 'claude-test' },
@@ -166,7 +178,7 @@ describe('the mod logs the mechanical events', () => {
 
   test('no project record: nothing is logged, not even under HOME', async ($, on) => {
     const { files } = world(on, { '/home/u/.learning/general/retries.md': '---\nstatus: learning\n---\n' })
-    await $.session.append({
+    await append($, {
       message: { type: 'assistant', role: 'assistant', content: [{ type: 'text', text: 'Guardrail · GO · copy tweak' }] },
       door: 'response',
       origin: { kind: 'model', model: 'claude-test' },
@@ -206,8 +218,8 @@ describe('a question asked without a lock', () => {
   test('opens a lock from the Your move line, labelled from the header and triage', async ($, on) => {
     const { files } = world(on, { '/proj/.learning/session.md': '## Now' })
     await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
-    await $.session.append(reply('Guardrail · GATE · concurrency: retry on a POST', 'r1'))
-    await $.session.append(reply('Checkpoint 1/1 · ~2 min · concurrency\nWhy it matters: two runs.\n👉 **Your move:** One run or two, and why?', 'r2'))
+    await append($, reply('Guardrail · GATE · concurrency: retry on a POST', 'r1'))
+    await append($, reply('Checkpoint 1/1 · ~2 min · concurrency\nWhy it matters: two runs.\n👉 **Your move:** One run or two, and why?', 'r2'))
     expect(files.get(LOCK)).toBe('GATE · concurrency · One run or two, and why?\n')
     expect(events(files).map(e => e.e)).toEqual(['triage', 'gate_open'])
     expect(refusal(await $.tool.call(edit('/proj/src/a.ts')))).toContain('One run or two')
@@ -216,19 +228,19 @@ describe('a question asked without a lock', () => {
   test('an Own-it question opens an own-it lock', async ($, on) => {
     const { files } = world(on, { '/proj/.learning/session.md': '## Now' })
     await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
-    await $.session.append(reply('Built it.\n\nOwn it · 1 question\n👉 **Your move:** The panel unmounts mid-fetch. What happens?', 'r3'))
+    await append($, reply('Built it.\n\nOwn it · 1 question\n👉 **Your move:** The panel unmounts mid-fetch. What happens?', 'r3'))
     expect(files.get(LOCK)).toBe('GATE · own it · The panel unmounts mid-fetch. What happens?\n')
   })
 
   test("Claude's own lock is never overwritten", async ($, on) => {
     const { files } = world(on, { [LOCK]: LOCK_LINE })
-    await $.session.append(reply('👉 **Your move:** A smaller question?', 'r4'))
+    await append($, reply('👉 **Your move:** A smaller question?', 'r4'))
     expect(files.get(LOCK)).toBe(LOCK_LINE)
   })
 
   test('a reply with no question opens nothing', async ($, on) => {
     const { files } = world(on, { '/proj/.learning/session.md': '## Now' })
-    await $.session.append(reply('Yes. Nothing cancels the first request. Logged. Building.', 'r5'))
+    await append($, reply('Yes. Nothing cancels the first request. Logged. Building.', 'r5'))
     expect(files.has(LOCK)).toBe(false)
   })
 
@@ -266,7 +278,7 @@ describe('opt-in', () => {
 
   test("no auto-lock until the skill is called", async ($, on) => {
     const { files } = world(on, { '/proj/.learning/session.md': '## Now' })
-    await $.session.append(reply('👉 **Your move:** One run or two?', 'r9'))
+    await append($, reply('👉 **Your move:** One run or two?', 'r9'))
     expect(files.has(LOCK)).toBe(false)
   })
 
