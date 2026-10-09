@@ -29,16 +29,6 @@ Or copy `skills/learning-guardrails` into `~/.claude/skills/`.
 
 The skill's scripts need Node 18 or newer.
 
-## Layout
-
-```
-.claude-plugin/marketplace.json   marketplace listing; plugin names here are what people install by
-skills/<name>/SKILL.md            one folder per skill
-plugins/<name>/                   one folder per mod or plugin
-```
-
-Renaming an entry in `marketplace.json` breaks updates for anyone who already installed it, so treat the names as fixed.
-
 ## Develop
 
 ```
