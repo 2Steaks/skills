@@ -1,0 +1,65 @@
+{
+  "pack": "python",
+  "about": "Python: Django, Flask, FastAPI, SQLAlchemy, Celery, asyncio and data tooling.",
+  "files": ["\\.(py|pyi|pyx|ipynb)$", "\\.(jinja2?|j2)$", "(^|/)templates/.+\\.(html?|txt|xml)$"],
+  "categories": {
+    "data": {
+      "paths": ["(^|/)alembic/", "(^|/)models\\.py$"],
+      "diff": [
+        "\\.objects\\.\\w+",
+        "\\b(session|db\\.session)\\.(execute|query|add|add_all|delete|merge|commit|flush|bulk_\\w+)\\(",
+        "\\bcursor\\.execute(many)?\\(|\\.executemany\\(",
+        "\\.(raw|extra)\\(\\s*[rfbu]?['\"]",
+        "\\bmigrations\\.\\w+\\(|\\bop\\.(add_column|drop_column|alter_column|create_table|drop_table|create_index|drop_index|execute)\\(",
+        "\\.to_sql\\(|\\bread_sql(_query|_table)?\\(",
+        "\\bredis\\.|\\bcache\\.(get|get_or_set|delete_many|clear)\\(|\\bcache_page\\b"
+      ]
+    },
+    "concurrency": {
+      "diff": [
+        "\\basyncio\\.\\w+|\\bTaskGroup\\b|\\banyio\\b|\\btrio\\b",
+        "\\bthreading\\b|\\bmultiprocessing\\b|\\bconcurrent\\.futures\\b|\\b(Thread|Process)PoolExecutor\\b",
+        "\\.(delay|apply_async)\\(|@(shared_)?task\\b|@\\w+\\.task\\b|\\bcelery\\b|\\bbeat_schedule\\b|\\bcrontab\\(",
+        "\\.(acquire|release)\\(|\\bselect_for_update\\b",
+        "\\bgevent\\b|\\beventlet\\b|\\bsignal\\.signal\\("
+      ]
+    },
+    "security": {
+      "diff": [
+        "\\bsubprocess\\b|\\bos\\.(system|popen|exec\\w*|spawn\\w*)\\(|shell\\s*=\\s*True",
+        "\\bpickle\\.loads?\\(|\\bmarshal\\.loads?\\(|\\byaml\\.(load|unsafe_load|full_load)\\(|\\bshelve\\.open\\(",
+        "\\bexec\\(|__import__\\(",
+        "\\.(execute|executemany|raw)\\(\\s*f['\"]|\\.(execute|raw)\\(\\s*['\"][^'\"]*['\"]\\s*(%|\\.format\\()",
+        "\\bmark_safe\\(|\\|\\s*safe\\b|\\bautoescape\\s+(off|false)\\b|\\bMarkup\\(|\\bformat_html\\(",
+        "\\bverify\\s*=\\s*False\\b|\\bcsrf_exempt\\b|\\bDEBUG\\s*=\\s*True\\b|\\bALLOWED_HOSTS\\b|\\bpermission_classes\\b|@login_required\\b",
+        "\\bhashlib\\.|\\bhmac\\.|\\bcryptography\\b"
+      ]
+    },
+    "performance": {
+      "diff": [
+        "\\b(select|prefetch)_related\\b|\\.only\\(|\\.defer\\(|\\.iterator\\(\\)",
+        "\\blru_cache\\b|\\bcached_property\\b|@(functools\\.)?cache\\b",
+        "\\.iterrows\\(\\)|\\.itertuples\\(\\)|\\.apply\\(\\s*lambda",
+        "\\.collect\\(\\)|\\.to_?pandas\\(\\)|\\.(repartition|coalesce|persist|broadcast)\\("
+      ]
+    },
+    "state": {
+      "diff": [
+        "^\\s*global\\s+\\w+",
+        "\\bContextVar\\(|\\bcontextvars\\b|\\bthreading\\.local\\(",
+        "@receiver\\(|\\b(pre|post)_(save|delete|init)\\b|\\bm2m_changed\\b",
+        "\\bsession\\[|\\bflask\\.g\\b|\\bg\\.\\w+\\s*="
+      ]
+    },
+    "contracts": {
+      "paths": [
+        "(^|/)(requirements[^/]*\\.(txt|in)|pyproject\\.toml|setup\\.(py|cfg)|Pipfile|environment\\.ya?ml)$",
+        "(^|/)(serializers?|urls|schemas?|api)\\.py$"
+      ],
+      "diff": [
+        "@(app|router|bp|blueprint|api|\\w+_router)\\.(get|post|put|patch|delete|route|websocket)\\(",
+        "@api_view\\(|\\bclass\\s+\\w+\\(\\s*(\\w+\\.)?(BaseModel|Schema|Serializer|ModelSerializer|ViewSet|ModelViewSet|APIView)\\b"
+      ]
+    }
+  }
+}

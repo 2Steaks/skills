@@ -1,0 +1,42 @@
+{
+  "pack": "rust",
+  "about": "Rust: sqlx, Diesel, tokio, unsafe and serde.",
+  "files": ["\\.rs$"],
+  "categories": {
+    "data": {
+      "diff": [
+        "\\bsqlx::|\\bquery(_as|_scalar)?!\\s*\\(|\\bquery(_as|_scalar)?\\(\\s*\"",
+        "\\bdiesel::|\\b(insert_into|update|delete)\\(\\s*\\w+::table",
+        "\\bsea_orm\\b|\\.(execute|fetch_one|fetch_all|fetch_optional)\\(\\s*&",
+        "\\bredis::|\\bdeadpool_redis\\b"
+      ]
+    },
+    "concurrency": {
+      "diff": [
+        "\\btokio::(spawn|sync|time|task)\\b|\\btokio::(select|join|try_join)!|\\bthread::spawn\\b|\\bspawn_blocking\\b",
+        "\\b(Arc|Mutex|RwLock)<|\\bArc::new\\(|\\b(Mutex|RwLock)::new\\(|\\.lock\\(\\)|\\.(read|write)\\(\\)\\.(unwrap|await)",
+        "\\bmpsc::|\\boneshot::|\\bbroadcast::|\\bcrossbeam\\b|\\brayon\\b|\\bpar_iter\\b",
+        "\\bAtomic(Bool|Usize|Isize|U8|U16|U32|U64|I32|I64|Ptr)\\b|\\bunsafe\\s+impl\\s+(Send|Sync)\\b"
+      ]
+    },
+    "security": {
+      "diff": [
+        "\\bunsafe\\s*\\{|\\bunsafe\\s+fn\\b|\\b(std::)?mem::(transmute|forget|zeroed)\\b|\\bfrom_raw_parts(_mut)?\\b|\\bBox::from_raw\\b",
+        "\\bCommand::new\\(|\\bstd::process::Command\\b",
+        "\\bdanger_accept_invalid_(certs|hostnames)\\b|\\bdangerous\\(\\)",
+        "\\b(ring|rustls|openssl|aes_gcm|chacha20poly1305|ed25519_dalek|argon2|sha2|hmac|rsa)::"
+      ],
+      "diffExact": ["format!\\(\\s*\"[^\"]*\\b(SELECT|INSERT|UPDATE|DELETE|WHERE)\\b"]
+    },
+    "performance": {
+      "diff": ["#\\[inline(\\(always\\))?\\]|\\bwith_capacity\\(|\\bCow<|\\bSmallVec\\b|\\bbumpalo\\b", "\\bcriterion\\b|#\\[bench\\]"]
+    },
+    "state": {
+      "diff": ["\\bstatic\\s+mut\\b|\\blazy_static!|\\bonce_cell\\b|\\b(LazyLock|OnceLock|LazyCell|OnceCell)\\b|\\bthread_local!", "\\bRefCell<|\\bRc<|\\bCell<"]
+    },
+    "contracts": {
+      "paths": ["(^|/)Cargo\\.toml$", "(^|/)build\\.rs$"],
+      "diff": ["#\\[derive\\([^)]*\\b(Serialize|Deserialize)\\b", "#\\[serde\\(", "\\.route\\(\\s*\"/|#\\[(get|post|put|patch|delete)\\(\\s*\"/"]
+    }
+  }
+}

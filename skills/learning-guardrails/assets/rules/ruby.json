@@ -1,0 +1,51 @@
+{
+  "pack": "ruby",
+  "about": "Ruby and Rails: ActiveRecord, migrations, background jobs, views.",
+  "files": ["\\.(rb|rake|erb|haml|slim|jbuilder)$", "(^|/)(Gemfile|Rakefile)$"],
+  "categories": {
+    "data": {
+      "paths": ["(^|/)db/migrate/", "(^|/)db/(schema\\.rb|structure\\.sql)$"],
+      "diff": [
+        "\\b(add|remove|rename|change)_(column|index|reference|belongs_to|timestamps|foreign_key)\\b|\\b(create|drop|change|rename)_table\\b|\\bchange_column_(null|default)\\b",
+        "\\.(where|find_by|find_by_sql|pluck|joins|having)\\(|\\.(update_all|delete_all|destroy_all|update_columns|update_column|insert_all|upsert_all)\\b",
+        "\\bexecute\\s*\\(?\\s*(<<~?\\w+|['\"%])",
+        "\\bRails\\.cache\\.|\\bRedis\\.new\\b|\\$redis\\b"
+      ]
+    },
+    "concurrency": {
+      "diff": [
+        "\\bThread\\.new\\b|\\bMutex\\.new\\b|\\bQueue\\.new\\b|\\bConcurrent::",
+        "\\.perform_(async|later|in|at|bulk)\\b|\\bdeliver_later\\b|\\bActiveJob\\b|\\bsidekiq\\b|\\bgood_job\\b|\\bsolid_queue\\b",
+        "\\bwith_lock\\b|\\block!|\\block_version\\b"
+      ]
+    },
+    "security": {
+      "diff": [
+        "\\bsystem\\(|\\bexec\\(|%x[\\(\\{\\[]|`[^`]*#\\{|\\bOpen3\\.|\\bspawn\\(|\\bIO\\.popen\\b",
+        "\\.html_safe\\b|\\braw\\(|<%==|\\bsanitize\\(",
+        "\\.(where|find_by_sql|order|joins|group|having|pluck|select)\\(\\s*\"[^\"]*#\\{|\\bexecute\\(\\s*\"[^\"]*#\\{",
+        "\\bconstantize\\b|\\.(send|public_send)\\(\\s*params|\\b(Marshal|YAML)\\.load\\b",
+        "\\.permit[!(]",
+        "\\bskip_before_action\\s+:(authenticate|verify|require_login)\\w*|\\bskip_forgery_protection\\b|\\bprotect_from_forgery\\b|\\bdevise\\b|\\bpundit\\b|\\bcancancan\\b|\\bhas_secure_password\\b"
+      ]
+    },
+    "performance": {
+      "diff": [
+        "\\.(includes|preload|eager_load)\\(",
+        "\\.(find_each|find_in_batches|in_batches)\\b|\\bcounter_cache\\b",
+        "\\bRails\\.cache\\.fetch\\b"
+      ]
+    },
+    "state": {
+      "diff": [
+        "^\\s*\\$\\w+\\s*=|@@\\w+",
+        "\\bThread\\.current\\[|\\bCurrentAttributes\\b|\\bCurrent\\.\\w+\\s*=",
+        "\\b(after|before|around)_(commit|save|create|update|destroy|validation|rollback)\\b"
+      ]
+    },
+    "contracts": {
+      "paths": ["(^|/)Gemfile$", "\\.gemspec$", "(^|/)config/routes\\.rb$", "(^|/)app/serializers/", "\\.jbuilder$"],
+      "diff": ["\\bresources?\\s+:\\w+|\\bnamespace\\s+:\\w+"]
+    }
+  }
+}

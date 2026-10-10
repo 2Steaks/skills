@@ -1,0 +1,49 @@
+{
+  "pack": "swift",
+  "about": "Swift and Objective-C: SwiftUI, Combine, structured concurrency, Core Data, SwiftData and the Keychain.",
+  "files": ["\\.(swift|m|mm)$"],
+  "categories": {
+    "data": {
+      "diffExact": [
+        "\\b(NSManagedObjectContext|NSPersistentContainer|NSFetchRequest|NSBatchDeleteRequest|ModelContext|ModelContainer|FetchDescriptor)\\b|@(Model|Query|Attribute|Relationship)\\b",
+        "\\b(context|viewContext|modelContext)\\.(save|delete|insert)\\(",
+        "\\b(VersionedSchema|SchemaMigrationPlan|NSMappingModel|NSMigrationManager)\\b|\\bsqlite3_\\w+\\(|\\b(GRDB|Realm|FMDatabase)\\b",
+        "\\b(URLCache|NSCache)\\b"
+      ]
+    },
+    "concurrency": {
+      "diffExact": [
+        "\\b(DispatchQueue|DispatchGroup|DispatchSemaphore|DispatchWorkItem|OperationQueue)\\b",
+        "\\bTask\\s*(\\(|\\{)|\\bTask\\.detached\\b|\\b(TaskGroup|ThrowingTaskGroup|withTaskGroup|withThrowingTaskGroup|AsyncStream|AsyncThrowingStream|withCheckedContinuation|withCheckedThrowingContinuation)\\b",
+        "^\\s*((public|private|internal|final)\\s+)*actor\\s+\\w+|@(MainActor|globalActor)\\b|\\bnonisolated\\b",
+        "\\b(NSLock|NSRecursiveLock|os_unfair_lock|OSAllocatedUnfairLock)\\b|\\bTimer\\.(scheduledTimer|publish)\\b",
+        "\\.sink\\s*\\{|\\.receive\\(on:|\\bAnyCancellable\\b|\\bPassthroughSubject\\b|\\bCurrentValueSubject\\b"
+      ]
+    },
+    "security": {
+      "paths": ["(^|/)Info\\.plist$", "\\.entitlements$"],
+      "diffExact": [
+        "\\bSecItem(Add|CopyMatching|Update|Delete)\\b|\\bkSec\\w+|\\bKeychain\\w*\\b",
+        "\\bevaluateJavaScript\\(|\\bloadHTMLString\\(|\\bWKUserScript\\b",
+        "\\b(LAContext|LocalAuthentication|CryptoKit|CommonCrypto)\\b|\\bSecKey\\w*|\\bCC_SHA\\w+",
+        "\\bserverTrust\\b|\\bNSAllowsArbitraryLoads\\b|didReceive\\s+challenge"
+      ]
+    },
+    "performance": {
+      "diffExact": [
+        "\\b(LazyVStack|LazyHStack|LazyVGrid|LazyHGrid|EquatableView)\\b|\\.equatable\\(\\)|\\.drawingGroup\\(\\)",
+        "\\b(os_signpost|OSSignposter)\\b|\\bprefetchDataSource\\b|\\bUI(TableView|CollectionView)DataSourcePrefetching\\b"
+      ]
+    },
+    "state": {
+      "diffExact": [
+        "@(StateObject|ObservedObject|EnvironmentObject|Environment|Published|Observable|Bindable|AppStorage|SceneStorage)\\b|\\bObservableObject\\b",
+        "\\b(UserDefaults|NotificationCenter)\\b|\\.onAppear\\b|\\.onDisappear\\b|\\.task\\s*(\\(|\\{)|\\.onReceive\\(|\\.onChange\\("
+      ]
+    },
+    "contracts": {
+      "paths": ["(^|/)Package\\.swift$", "(^|/)Podfile$", "\\.podspec$", "(^|/)Cartfile$"],
+      "diffExact": ["\\bCodingKeys\\b|\\b(Codable|Decodable|Encodable)\\b"]
+    }
+  }
+}

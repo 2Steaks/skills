@@ -1,0 +1,76 @@
+{
+  "pack": "core",
+  "about": "Signals that hold in any stack. No file scope: every changed file and line. `ignore` drops files that aren't building (SKILL.md §1): prose, lock files, vendored and generated code, stylesheets, translations.",
+  "ignore": [
+    "\\.(md|markdown|rst|adoc)$",
+    "(^|/)docs?/.+\\.mdx$",
+    "(^|/)(LICEN[CS]E|COPYING|NOTICE|AUTHORS|CHANGELOG)(\\.(md|txt|rst))?$",
+    "(^|/)release[ _-]?notes/",
+    "(^|/)(package-lock\\.json|npm-shrinkwrap\\.json|yarn\\.lock|pnpm-lock\\.yaml|bun\\.lockb?|Cargo\\.lock|Gemfile\\.lock|composer\\.lock|poetry\\.lock|Pipfile\\.lock|uv\\.lock|go\\.sum|packages\\.lock\\.json|Package\\.resolved|Podfile\\.lock|gradle\\.lockfile|flake\\.lock|mix\\.lock)$",
+    "(^|/)(vendor|node_modules|third_party|bower_components|Pods|Carthage|dist)/",
+    "\\.(pb\\.go|pb\\.cc|pb\\.h|g\\.dart|designer\\.cs)$|_pb2(_grpc)?\\.pyi?$|\\.generated\\.\\w+$",
+    "\\.(min\\.js|map|snap|svg)$|(^|/)__snapshots__/",
+    "\\.(css|scss|sass|less|styl)$",
+    "(^|/)(locales?|i18n|l10n|translations|lang)/.+\\.(json|ya?ml|po|pot|properties|toml|xliff|xlf|arb|strings|php)$",
+    "\\.(xcstrings|strings|stringsdict|po|pot|xliff|xlf|resx|arb)$"
+  ],
+  "categories": {
+    "data": {
+      "paths": ["(^|/)migrations?/", "\\.sql$", "(^|/)schema\\.graphql$"],
+      "diff": ["\\btransaction\\b", "\\bcache\\.(set|put|delete)\\("],
+      "diffExact": [
+        "\\b(SELECT|INSERT INTO|UPDATE|DELETE FROM)\\b",
+        "CREATE (UNIQUE )?INDEX",
+        "ALTER TABLE",
+        "\\bDROP (TABLE|COLUMN|INDEX|DATABASE|SCHEMA)\\b",
+        "\\bTRUNCATE\\b"
+      ]
+    },
+    "concurrency": {
+      "diff": [
+        "\\bretr(y|ies)\\b",
+        "\\b(mutex|semaphore|queue)\\b",
+        "\\bpoll(ing)?\\b",
+        "\\bWebSocket\\b|\\bEventSource\\b",
+        "\\bworker\\b",
+        "\\bbackoff\\b"
+      ]
+    },
+    "security": {
+      "paths": [
+        "(^|/)auth",
+        "permission",
+        "(^|/)security",
+        "(^|/)middleware",
+        "(^|/)(oauth|sso|saml)",
+        "(^|/)\\.env(\\.|$)",
+        "\\.(pem|key|p12|pfx|jks|keystore)$"
+      ],
+      "diff": [
+        "\\beval\\(",
+        "\\b(token|password|secret|api[_-]?key|credential)s?\\b",
+        "\\b(cookie|csrf|cors)\\b|Content-Security-Policy",
+        "\\bjwt\\b",
+        "\\b(role|permission)s?\\b",
+        "\\b(oauth|oidc|openid|saml|sso)\\b",
+        "\\b(bcrypt|scrypt|argon2|pbkdf2)\\b",
+        "\\b(un)?authori[sz](e|ed|es|ing|ation)\\b"
+      ],
+      "diffExact": ["\\b[A-Z0-9_]*(TOKEN|PASSWORD|PASSWD|SECRET|API_?KEY|PRIVATE_KEY|ACCESS_KEY|CREDENTIALS?)[A-Z0-9_]*\\b"]
+    },
+    "performance": {
+      "diff": ["\\b(debounce|throttle)\\b", "\\bN\\+1\\b", "\\b(lazy|eager)[_-]?load(s|ed|ing)?\\b"]
+    },
+    "state": {
+      "diff": ["\\.subscribe\\("]
+    },
+    "contracts": {
+      "paths": ["(^|/)api/", "openapi", "swagger", "\\.proto$", "\\.avsc$", "(^|/)types?/", "(^|/)schemas?/"],
+      "diff": [
+        "rm -rf|--force\\b|push -f\\b",
+        "\\breset --hard\\b|\\bclean -[a-z]*f",
+        "\\b(payment|billing|invoice|refund|payout)s?\\b"
+      ]
+    }
+  }
+}

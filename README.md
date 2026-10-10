@@ -9,6 +9,8 @@ Skills and mods for Claude Code.
 
 They're built to go together: the skill decides when to stop, the mod makes sure nothing slips past.
 
+The skill's risk signals cover JS/TS (React, Vue, Svelte, Angular, Node), Python, Go, Ruby, Java/Kotlin, C#, PHP, Rust, Swift and infra (Terraform, Kubernetes, Docker, CI). Adding a stack is one file: see [the rule packs](skills/learning-guardrails/assets/rules).
+
 ## Install
 
 In Claude Code, add this repo as a marketplace, then install what you want:

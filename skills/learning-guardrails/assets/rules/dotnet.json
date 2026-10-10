@@ -1,0 +1,55 @@
+{
+  "pack": "dotnet",
+  "about": "C# and .NET: EF Core, ASP.NET Core, tasks and Blazor.",
+  "files": ["\\.(cs|fs|fsx|vb|cshtml|razor)$"],
+  "categories": {
+    "data": {
+      "diffExact": [
+        "\\bDbContext\\b|\\bDbSet<|\\.SaveChanges(Async)?\\(|\\.(FromSqlRaw|FromSqlInterpolated|ExecuteSqlRaw|ExecuteSqlInterpolated|ExecuteDelete|ExecuteUpdate)(Async)?\\(",
+        "\\b(SqlCommand|SqlConnection|NpgsqlCommand|DbCommand)\\b|\\.(ExecuteNonQuery|ExecuteScalar|ExecuteReader)(Async)?\\(|\\bconnection\\.(Query|Execute)(Async)?\\b",
+        "\\b(IMemoryCache|IDistributedCache|HybridCache)\\b|\\bmigrationBuilder\\.",
+        "^\\s*\\[(Key|Table|Column|ForeignKey|Index)\\b"
+      ]
+    },
+    "concurrency": {
+      "diffExact": [
+        "\\bTask\\.(Run|WhenAll|WhenAny|Delay|Factory)\\b|\\bParallel\\.|\\.AsParallel\\(\\)",
+        "\\block\\s*\\(|\\b(SemaphoreSlim|Mutex|Monitor|Interlocked|ConcurrentDictionary|ConcurrentQueue|ConcurrentBag|ReaderWriterLockSlim)\\b|\\bChannel<",
+        "\\bCancellationTokenSource\\b|\\.ConfigureAwait\\(|\\.Result\\b|\\.Wait\\(\\)|\\.GetAwaiter\\(\\)\\.GetResult\\(\\)",
+        "\\b(IHostedService|BackgroundService|PeriodicTimer)\\b"
+      ]
+    },
+    "security": {
+      "diffExact": [
+        "\\bProcess\\.Start\\(|\\bProcessStartInfo\\b",
+        "\\.(FromSqlRaw|ExecuteSqlRaw)(Async)?\\(\\s*\\$\"|\\bnew SqlCommand\\(\\s*\\$\"|\\bnew SqlCommand\\(\\s*\"[^\"]*\"\\s*\\+",
+        "\\bBinaryFormatter\\b|\\bTypeNameHandling\\.(All|Auto|Objects|Arrays)\\b|\\bLosFormatter\\b|\\bNetDataContractSerializer\\b",
+        "\\[(Authorize|AllowAnonymous)\\b|\\b(AddAuthentication|AddAuthorization|UseAuthentication|UseAuthorization|AddIdentity)\\b",
+        "@Html\\.Raw\\(|\\bHtmlString\\b|\\bMarkupString\\b",
+        "\\b(ValidateAntiForgeryToken|IgnoreAntiforgeryToken)\\b|\\bServerCertificateCustomValidationCallback\\b|\\bDangerousAcceptAnyServerCertificateValidator\\b",
+        "\\b(Rfc2898DeriveBytes|Aes|RSA|HMACSHA256|SHA256|RandomNumberGenerator)\\.(Create|HashData|GetBytes)\\b|\\bDataProtection\\b"
+      ]
+    },
+    "performance": {
+      "diffExact": [
+        "\\b(Span|ReadOnlySpan|Memory|ReadOnlyMemory)<|\\bArrayPool\\b|\\bstackalloc\\b",
+        "\\.AsNoTracking(WithIdentityResolution)?\\(\\)|\\.Include\\(|\\.ThenInclude\\(|\\.AsSplitQuery\\(\\)",
+        "\\[(ResponseCache|OutputCache)\\b|\\bVirtualize\\b"
+      ]
+    },
+    "state": {
+      "diffExact": [
+        "\\bAdd(Singleton|Scoped|Transient)\\b",
+        "\\bstatic\\s+(?!readonly\\b)(?!class\\b)(?!void\\b)(?!async\\b)[\\w<>\\[\\], ?]+\\s+\\w+\\s*=",
+        "\\b(INotifyPropertyChanged|ObservableCollection|StateHasChanged)\\b|\\bHttpContext\\.Session\\b|\\[CascadingParameter\\b"
+      ]
+    },
+    "contracts": {
+      "paths": ["\\.(cs|fs|vb)proj$", "(^|/)Directory\\.(Build|Packages)\\.props$", "(^|/)packages\\.config$", "(^|/)appsettings[^/]*\\.json$", "(^|/)global\\.json$"],
+      "diffExact": [
+        "\\[Http(Get|Post|Put|Patch|Delete)\\b|\\[Route\\(|\\[ApiController\\]|\\.Map(Get|Post|Put|Patch|Delete|Group)\\(",
+        "\\[(JsonPropertyName|JsonProperty|DataMember)\\b"
+      ]
+    }
+  }
+}

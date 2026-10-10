@@ -1,0 +1,61 @@
+{
+  "pack": "jvm",
+  "about": "Java, Kotlin and Scala: Spring, JPA, coroutines, Compose and Android.",
+  "files": ["\\.(java|kt|kts|scala|groovy)$"],
+  "categories": {
+    "data": {
+      "paths": ["(^|/)db/changelog/", "(^|/)(liquibase|flyway)/"],
+      "diffExact": [
+        "@(Query|Modifying|Transactional|Entity|Table|Column|JoinColumn|OneToMany|ManyToOne|ManyToMany|Id)\\b",
+        "\\b(EntityManager|JdbcTemplate|NamedParameterJdbcTemplate|PreparedStatement|SessionFactory)\\b|\\.(executeUpdate|executeQuery|prepareStatement|createQuery|createNativeQuery)\\(",
+        "@(Cacheable|CacheEvict|CachePut)\\b",
+        "@(Dao|Insert|Delete|Update|Upsert|RawQuery)\\b|\\bMigration\\(\\s*\\d+\\s*,\\s*\\d+\\s*\\)|\\bRoom\\.databaseBuilder\\b"
+      ]
+    },
+    "concurrency": {
+      "diffExact": [
+        "\\bsynchronized\\b|\\bvolatile\\b|\\b(ExecutorService|Executors|CompletableFuture|ForkJoinPool|ReentrantLock|ReadWriteLock|CountDownLatch|CyclicBarrier|ConcurrentHashMap|Semaphore)\\b|\\bAtomic(Integer|Long|Boolean|Reference)\\b|\\bnew Thread\\(",
+        "@(Async|Scheduled|EnableAsync|EnableScheduling)\\b|\\.parallelStream\\(\\)|\\.parallel\\(\\)",
+        "\\b(launch|async)\\s*(\\(|\\{)|\\b(withContext|coroutineScope|supervisorScope|runBlocking|withTimeout)\\b|\\bDispatchers\\.|\\b(GlobalScope|viewModelScope|lifecycleScope|CoroutineScope)\\b|\\bMutex\\(\\)|\\bChannel<|\\bflow\\s*\\{",
+        "\\b(Mono|Flux)\\.|\\.(subscribeOn|observeOn|publishOn)\\("
+      ]
+    },
+    "security": {
+      "paths": ["(^|/)AndroidManifest\\.xml$"],
+      "diffExact": [
+        "Runtime\\.getRuntime\\(\\)\\.exec\\(|\\bProcessBuilder\\b",
+        "\\.(createQuery|createNativeQuery|executeQuery|executeUpdate|prepareStatement|queryForObject|queryForList)\\(\\s*\"[^\"]*\"\\s*\\+|\\.(createQuery|createNativeQuery|executeQuery|executeUpdate|prepareStatement)\\(\\s*\"[^\"]*\\$\\{?\\w",
+        "\\bObjectInputStream\\b|\\.readObject\\(|\\bXMLDecoder\\b|\\benableDefaultTyping\\(",
+        "@(PreAuthorize|PostAuthorize|Secured|RolesAllowed|PermitAll|DenyAll)\\b|\\b(SecurityFilterChain|HttpSecurity|WebSecurityConfigurerAdapter)\\b|\\.permitAll\\(\\)",
+        "\\b(MessageDigest|Cipher|SecretKeySpec|KeyStore|KeyPairGenerator|Mac)\\b|\\bSecureRandom\\b",
+        "\\b(TrustManager|X509TrustManager|HostnameVerifier)\\b",
+        "\\bsetJavaScriptEnabled\\(\\s*true|\\baddJavascriptInterface\\(|\\bsetAllowFileAccess\\(\\s*true|\\bMODE_WORLD_(READABLE|WRITEABLE)\\b"
+      ]
+    },
+    "performance": {
+      "diffExact": [
+        "\\b(LazyColumn|LazyRow|LazyVerticalGrid|RecyclerView|DiffUtil|ListAdapter)\\b",
+        "\\bderivedStateOf\\b|@(Stable|Immutable)\\b",
+        "\\bFetchType\\.(LAZY|EAGER)\\b|@(BatchSize|EntityGraph)\\b|\\bJOIN FETCH\\b"
+      ]
+    },
+    "state": {
+      "diffExact": [
+        "\\b(rememberSaveable|LaunchedEffect|DisposableEffect|SideEffect|collectAsState|collectAsStateWithLifecycle|produceState)\\b",
+        "\\b(ViewModel|LiveData|MutableLiveData|StateFlow|SharedFlow|MutableStateFlow|MutableSharedFlow|SharedPreferences|DataStore|ThreadLocal)\\b",
+        "@(Scope|SessionScope|RequestScope|ApplicationScope|Singleton)\\b|\\bstatic\\s+(?!final\\b)(?!class\\b)(?!void\\b)[\\w<>\\[\\], ?]+\\s+\\w+\\s*="
+      ]
+    },
+    "contracts": {
+      "paths": [
+        "(^|/)(pom\\.xml|build\\.gradle(\\.kts)?|settings\\.gradle(\\.kts)?|gradle\\.properties)$",
+        "(^|/)gradle/libs\\.versions\\.toml$",
+        "(^|/)src/main/resources/application[^/]*\\.(ya?ml|properties)$"
+      ],
+      "diffExact": [
+        "@(Get|Post|Put|Patch|Delete|Request)Mapping\\b|@(RestController|Path|Produces|Consumes)\\b",
+        "@(JsonProperty|SerializedName|Json|Serializable)\\b"
+      ]
+    }
+  }
+}

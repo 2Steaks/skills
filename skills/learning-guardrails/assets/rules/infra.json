@@ -1,0 +1,75 @@
+{
+  "pack": "infra",
+  "about": "Terraform, Kubernetes, Helm, Docker, CI/CD, cloud config and deploy scripts.",
+  "files": [
+    "\\.(tf|tfvars|hcl|sh|bash|ps1)$",
+    "(^|/)(Dockerfile|Containerfile)[^/]*$|\\.dockerfile$",
+    "(^|/)(docker-)?compose[^/]*\\.ya?ml$",
+    "(^|/)(\\.github/workflows|\\.circleci|\\.buildkite|k8s|kubernetes|manifests|helm|kustomize|deploy|deployments?|infra|terraform|ansible|playbooks|cloudformation|devops)/",
+    "(^|/)charts/.+\\.(ya?ml|tpl)$",
+    "(^|/)(\\.gitlab-ci|azure-pipelines|bitbucket-pipelines|cloudbuild|\\.drone|serverless|skaffold|kustomization|Chart|render|fly|netlify|vercel)\\.(ya?ml|toml|json)$",
+    "(^|/)(Jenkinsfile|Procfile|Vagrantfile|Caddyfile)$",
+    "(^|/)nginx[^/]*\\.conf$|(^|/)\\.htaccess$"
+  ],
+  "categories": {
+    "data": {
+      "diff": [
+        "\\b(aws_db_instance|aws_rds_\\w+|aws_dynamodb_table|aws_s3_bucket\\w*|aws_elasticache_\\w+|aws_efs_file_system|google_sql_\\w+|google_storage_bucket\\w*|google_bigquery_\\w+|azurerm_(mssql|postgresql|mysql|cosmosdb|storage)_\\w+)\\b",
+        "\\b(PersistentVolumeClaim|PersistentVolume|StatefulSet|volumeClaimTemplates|storageClassName)\\b",
+        "\\b(prevent_destroy|deletion_protection|skip_final_snapshot|force_destroy|backup_retention_period|point_in_time_recovery|final_snapshot_identifier|reclaimPolicy|retain_on_delete)\\b"
+      ]
+    },
+    "concurrency": {
+      "diff": [
+        "\\bCronJob\\b|\\bcron(tab)?\\b|^\\s*schedule:",
+        "(^|[^a-z])(sqs|sns|kinesis|pubsub|kafka|rabbitmq|eventbridge|nats)([^a-z]|$)",
+        "^\\s*concurrency:|\\bparallelism:|\\bmaxSurge\\b|\\bmaxUnavailable\\b"
+      ]
+    },
+    "security": {
+      "paths": ["(^|/)nginx[^/]*\\.conf$|(^|/)\\.htaccess$|(^|/)Caddyfile$"],
+      "diff": [
+        "0\\.0\\.0\\.0/0|::/0",
+        "\"(Action|Resource|Principal)\"\\s*:\\s*\"\\*\"|\\b(actions|resources)\\s*=\\s*\\[\\s*\"\\*\"|\\bAdministratorAccess\\b|\\biam:PassRole\\b|\\bsts:AssumeRole\\b",
+        "\\b(aws_iam_\\w+|google_\\w*iam_\\w+|azurerm_role_\\w+|ClusterRole(Binding)?|RoleBinding|ServiceAccount)\\b",
+        "\\b(public-read(-write)?|publicly_accessible|PublicAccessBlock|block_public_\\w+|allUsers|allAuthenticatedUsers)\\b",
+        "\\b(ingress|egress|security_group\\w*|firewall\\w*|NetworkPolicy|cidr_blocks|source_ranges)\\b",
+        "\\b(kms\\w*|ssl\\w*|tls|certificate\\w*|acm_\\w+|cert-manager)\\b",
+        "\\bprivileged:\\s*true|\\ballowPrivilegeEscalation:\\s*true|\\brunAsUser:\\s*0\\b|\\bhost(Network|PID|IPC):\\s*true|\\bhostPath:|--privileged|\\bcap_add\\b|\\bSYS_ADMIN\\b|^\\s*USER\\s+root\\b",
+        "\\bpull_request_target\\b|\\bpermissions:\\s*write-all\\b|\\$\\{\\{\\s*github\\.event\\.(issue|pull_request|comment|review|head_commit)\\.",
+        "\\b(curl|wget)\\b[^|]*\\|\\s*(sudo\\s+)?(ba|z)?sh\\b|\\bchmod\\s+(-R\\s+)?(777|666|a\\+w)\\b"
+      ]
+    },
+    "performance": {
+      "diff": [
+        "\\b(replicas|minReplicas|maxReplicas|desired_count|min_size|max_size|min_capacity|max_capacity)\\b",
+        "\\b(HorizontalPodAutoscaler|autoscaling\\w*|instance_type|instance_class|machine_type|node_type|vm_size)\\b",
+        "^\\s*(limits|requests):\\s*$|^\\s*(cpu|memory):\\s*['\"]?\\d"
+      ]
+    },
+    "state": {
+      "diff": [
+        "\\bbackend\\s+\"(s3|gcs|azurerm|remote|http|consul)\"|\\bterraform_remote_state\\b|\\bterraform\\s+state\\b",
+        "\\b(sessionAffinity|session_affinity|sticky_sessions|stickiness)\\b"
+      ]
+    },
+    "contracts": {
+      "paths": [
+        "\\.(tf|tfvars|hcl)$",
+        "(^|/)(Dockerfile|Containerfile)[^/]*$|\\.dockerfile$",
+        "(^|/)(docker-)?compose[^/]*\\.ya?ml$",
+        "(^|/)(\\.github/workflows|\\.circleci|\\.buildkite|k8s|kubernetes|helm|kustomize|terraform|ansible|playbooks|cloudformation)/",
+        "(^|/)charts/.+\\.(ya?ml|tpl)$",
+        "(^|/)(\\.gitlab-ci|azure-pipelines|bitbucket-pipelines|cloudbuild|\\.drone|serverless|skaffold|kustomization|Chart|render|fly|netlify|vercel)\\.(ya?ml|toml|json)$",
+        "(^|/)(Jenkinsfile|Procfile)$"
+      ],
+      "diff": [
+        "\\bterraform\\s+(apply|destroy|import)\\b|\\b(tofu|terragrunt)\\s+(apply|destroy)\\b",
+        "\\bkubectl\\s+(apply|delete|replace|patch|scale|rollout|drain|cordon)\\b|\\bhelm\\s+(install|upgrade|uninstall|delete|rollback)\\b",
+        "\\baws\\s+[\\w-]+\\s+(delete|remove|terminate|put|create|update)-[\\w-]+|\\bgcloud\\s+[\\w\\s-]*\\b(delete|deploy)\\b|\\baz\\s+[\\w\\s-]*\\bdelete\\b",
+        "\\bdocker\\s+(push|system\\s+prune|volume\\s+rm|rm\\s+-f)\\b",
+        "\\b(cloudflare_record|google_dns_record_set|azurerm_dns_\\w+|aws_route53_\\w+)\\b"
+      ]
+    }
+  }
+}
