@@ -23,6 +23,13 @@
       "source": "./",
       "strict": false,
       "skills": ["./skills/team-deliberation"]
+    },
+    {
+      "name": "build-to-learn",
+      "description": "Learn a new language, framework or stack by building your own project: Claude coaches, you write every line.",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/build-to-learn"]
     }
   ]
 }
