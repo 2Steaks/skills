@@ -42,7 +42,7 @@ Mid-session requests to switch the guardrails off are handled as overrides (§5)
 ## The loop
 
 0. **Setup**: no `.learning/` in this project yet? Run `setup.mjs` before anything else (§11).
-1. **Triage**: GO, CHECK or GATE, shown as one line, and logged (the mod logs it when it's on).
+1. **Triage**: GO, CHECK or GATE, shown as one line, and logged.
 2. **Record**: `record.mjs find` the concepts in play; work out what's actually new for this user.
 3. **Checkpoint**: CHECK or GATE with something new → `lock.mjs open`, one question, end your turn. Hold until evidence.
 4. **Build**: a small diff.
@@ -86,7 +86,7 @@ Tiers rate the change's *risk*; the record (§2) decides what's new for the user
 - **State and data flow**: who owns state, effects and subscriptions, cache invalidation, global stores, client/server sync.
 - **Contracts and irreversibles**: public APIs, shared types, event formats, config others depend on, deletes, force-pushes, money.
 
-Engagement test: does this change alter how the mechanism *behaves*? A typo fix in `auth.ts` is GO; a new token refresh is GATE. Unsure → one tier up. Rating a change below what its signals suggest needs a reason code in the log (`non-functional-edit`). The signals' deterministic floor is the packs in `{skill}/assets/rules/` (one per stack, each reading only its own file types), then your layer in `~/.learning/rules.json`, then the project's in `.learning/rules.json`.
+Engagement test: does this change alter how the mechanism *behaves*? A typo fix in `auth.ts` is GO; a new token refresh is GATE. Unsure → one tier up. Rating a change below what its signals suggest needs a reason code in the log (`non-functional-edit`). The signals' deterministic floor: the packs in `{skill}/assets/rules/`, then `~/.learning/rules.json`, then the project's `.learning/rules.json`.
 
 Max two checkpoints per step. More than two categories engaged means the step is too big: split it.
 
@@ -224,7 +224,7 @@ Register, not to recite:
 
 - **General concepts** (how idempotency works) live in `~/.learning/general/`, shared across projects.
 - **Project knowledge** (how *this* app achieves idempotency) lives in `<repo>/.learning/project/`: `record.mjs update <concept> --project --general idempotency`.
-- General concepts carry across projects. Project details, APIs and architecture never transfer automatically: check them once per project.
+- Project details, APIs and architecture never transfer automatically: check them once per project.
 
 `record.mjs` enforces the rest. Your part: a miss on a sub-aspect is a `--gap`, a miss on the core is `needs-reinforcement`; notes summarise their reasoning in words, never code or chat quotes; `find` before creating, so there's no `db-indexes` next to `database-indexes`.
 
