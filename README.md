@@ -6,6 +6,7 @@ Skills and mods for Claude Code.
 | --- | --- | --- |
 | [Learning guardrails](#learning-guardrails) | skill + mod | Holds risky or new code until you show you understand it. |
 | [Team deliberation](#team-deliberation) | skill | Puts an idea or decision in front of a panel of independent specialist subagents. |
+| [Build to learn](#build-to-learn) | skill | Learn a new stack by building a project of your own, with Claude as coach. |
 
 In Claude Code, add this repo as a marketplace once:
 
@@ -41,6 +42,18 @@ Ask for "team deliberation", "poke holes in this" or "should we build X". A smal
 /plugin install team-deliberation@2steaks-skills
 ```
 
+## Build to learn
+
+[build-to-learn](skills/build-to-learn) teaches a new language, framework or stack through a real project you choose. You write every line; Claude coaches. It asks what you already know, what you want to build with and what you want to build. Then it shapes an MVP into milestones tagged with the concepts each one teaches, and writes a guide from your home stack to the new one that grows as you build.
+
+Along the way you get attempt-first diff reviews, spaced-review quizzes, an evidence-based concept map and break-and-fix challenges. Progress is saved in `.build-coach/` for the project and `~/.build-coach/` for you, so the next session picks up where you left off.
+
+```
+/plugin install build-to-learn@2steaks-skills
+```
+
+The scripts need bash and git. Audio and diagrams use a local text-to-speech engine and mermaid-cli when they're installed, and fall back to text when they aren't.
+
 ## Without the plugin system
 
 For any agent that reads `skills/`, pick the skills you want:
@@ -48,6 +61,7 @@ For any agent that reads `skills/`, pick the skills you want:
 ```
 npx skills add 2Steaks/skills --skill learning-guardrails
 npx skills add 2Steaks/skills --skill team-deliberation
+npx skills add 2Steaks/skills --skill build-to-learn
 ```
 
 Or copy a folder from `skills/` into `~/.claude/skills/`. The learning-gate mod needs the plugin system.
