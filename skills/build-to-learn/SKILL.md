@@ -93,7 +93,14 @@ One chunk per message, sized to a minute of reading. Every message ends with the
 
 ## Concept map and spaced review
 
-`learner-progress.md` holds two tables the modes keep updated:
+`learner-progress.md` holds two tables the modes keep updated. The scripts read these headings and columns:
+
+```markdown
+## Concept map
+| Concept | Level | Evidence | Last touched |
+## Review queue
+| Concept | Anchor | Last result | Interval | Next review |
+```
 
 **Concept map** — target-stack concepts with strictly evidence-based levels: *not seen* → *covered* (explained) → *recalled* (quizzed correctly) → *demonstrated* (shipped in their own milestone). Wrong answers demote. Render with `scripts/progress.sh render` (░▒▓█ glyphs, honest counts); show it on request and at session end, pointing at the biggest gap the *next milestone* will close.
 
@@ -113,4 +120,4 @@ Runs well on a fast mid-tier model. Offer a switch (as numbered options, once pe
 
 ## Maintaining the toolkit
 
-`tests/test_scripts.sh` self-tests every bundled script (~41 checks) against a throwaway fixture. Run it after any script change.
+`tests/test_scripts.sh` self-tests every bundled script (~48 checks) against a throwaway fixture. Run it after any script change.

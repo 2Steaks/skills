@@ -96,6 +96,33 @@ check "progress.sh lint catches bad plan date" "$?" 1
 bash "$S/progress.sh" lint "$work/nonexistent" >/dev/null 2>&1
 check "progress.sh lint exit 2 when no memory dir" "$?" 2
 
+# ---------- progress.sh reads the "## Concept map" SKILL.md describes ----------
+mem2="$work/mem2"; mkdir -p "$mem2"
+printf '# Project plan\nsave: auto\ndate: 2026-01-01\n\n## Milestones\n1. CLI skeleton\n' > "$mem2/project-plan.md"
+cat > "$mem2/learner-progress.md" << 'EOF'
+## Concept map
+| Concept | Level | Evidence | Last touched |
+|---|---|---|---|
+| Ownership | recalled | quiz | 2026-01-01 |
+| Borrowing | demonstrated | milestone 2 | 2026-01-02 |
+
+## Review queue
+| Concept | Anchor | Last result | Interval | Next review |
+|---|---|---|---|---|
+| Lifetimes | src/main.rs | wrong (2026-01-01) | 1d | 2026-01-02 |
+EOF
+out=$(bash "$S/progress.sh" render "$mem2/learner-progress.md")
+echo "$out" | grep -q "1 of 2 regions fully mapped" && ok "progress.sh render reads '## Concept map'" || bad "progress.sh render missed '## Concept map'"
+echo "$out" | grep -q "Concept" && bad "progress.sh render counted the header row" || ok "progress.sh render skips the Concept header row"
+bash "$S/progress.sh" due "$mem2/learner-progress.md" | grep -q "Lifetimes" && ok "progress.sh due reads the review queue beside a Concept map" || bad "progress.sh due missed the review queue"
+
+# ---------- progress.sh lint: consent is recorded in project-plan.md ----------
+bash "$S/progress.sh" lint "$mem2" >/dev/null 2>&1
+check "progress.sh lint passes a Concept map with consent in project-plan.md" "$?" 0
+sed -i.bak '/^save: /d' "$mem2/project-plan.md" 2>/dev/null || sed -i '' '/^save: /d' "$mem2/project-plan.md"
+bash "$S/progress.sh" lint "$mem2" >/dev/null 2>&1
+check "progress.sh lint flags a missing consent line" "$?" 1
+
 # ---------- validate_diagram.sh (0 = rendered, 2 = no tooling — both acceptable) ----------
 printf 'graph TD\n  A --> B\n' > "$work/d.mmd"
 timeout 120 bash "$S/validate_diagram.sh" "$work/d.mmd" >/dev/null 2>&1
@@ -113,6 +140,16 @@ echo "$out" | grep -q "PLAYING\|PLAYED" && echo "$out" | grep -q "NOTE: audio sa
 # ---------- validate_diagram.sh --open flag parsing ----------
 timeout 120 bash "$S/validate_diagram.sh" --open "$work/d.mmd" >/dev/null 2>&1
 check "validate_diagram.sh --open parses (renders+opens, or clean skip)" "$?" "0 2"
+
+# ---------- validate_diagram.sh error classification (fake renderer, runs anywhere) ----------
+fake="$work/fakebin"; mkdir -p "$fake"
+printf '#!/usr/bin/env bash\necho "Error: Parse error on line 2:"\necho "    at render (/x/node_modules/puppeteer-core/lib/esm/puppeteer/api/Page.js:1:1)"\nexit 1\n' > "$fake/mmdc"
+chmod +x "$fake/mmdc"
+PATH="$fake:$PATH" timeout 30 bash "$S/validate_diagram.sh" "$work/d.mmd" >/dev/null 2>&1
+check "validate_diagram.sh: parse error is the diagram's fault, even via puppeteer" "$?" 1
+printf '#!/usr/bin/env bash\necho "Error: Could not find Chrome (ver. 131.0.6778.204)."\nexit 1\n' > "$fake/mmdc"
+PATH="$fake:$PATH" timeout 30 bash "$S/validate_diagram.sh" "$work/d.mmd" >/dev/null 2>&1
+check "validate_diagram.sh: missing browser is tooling, not the diagram" "$?" 2
 
 
 

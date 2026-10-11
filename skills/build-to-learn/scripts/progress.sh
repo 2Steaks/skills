@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# progress.sh — deterministic helpers for the review queue and knowledge map.
+# progress.sh — deterministic helpers for the review queue and concept map.
+# Reads "## Concept map" (or the older "## Knowledge map") and "## Review queue".
 # The LLM still edits the tables; this script does the parts LLMs get subtly
 # wrong: date arithmetic, due filtering, and consistent fog-of-war rendering.
 #
@@ -7,7 +8,7 @@
 #   progress.sh promote <interval>           print the next rung up the ladder
 #   progress.sh demote                       print the bottom rung (1d)
 #   progress.sh due <learner-progress.md>    print review-queue rows due today or earlier
-#   progress.sh render <learner-progress.md> print the fog-of-war map from the knowledge map
+#   progress.sh render <learner-progress.md> print the fog-of-war map from the concept map
 #   progress.sh lint <.build-coach dir>    validate memory files (0 ok, 1 problems, 2 no dir)
 #   progress.sh anchor <learner-progress.md>  replace the Session state block with stdin content
 set -uo pipefail
@@ -46,7 +47,7 @@ case "$cmd" in
     f="${1:?usage: progress.sh due <learner-progress.md>}"; [ -f "$f" ] || die "$f not found"
     today=$(date +%F)
     awk -v today="$today" '
-      /^## Review queue/ {s=1; next}
+      tolower($0) ~ /^## review queue/ {s=1; next}
       /^## /             {s=0}
       s && /^\|/ && !/^\|[-:| ]+$/ && $0 !~ /\| *Concept/ {
         n=split($0, c, "|")
@@ -70,9 +71,9 @@ case "$cmd" in
         if (lv ~ /covered/)      return "sketched"
         return "unexplored"
       }
-      /^## Knowledge map/ {s=1; next}
+      tolower($0) ~ /^## (concept|knowledge) map/ {s=1; next}
       /^## /              {s=0}
-      s && /^\|/ && !/^\|[-:| ]+$/ && $0 !~ /\| *Area/ {
+      s && /^\|/ && !/^\|[-:| ]+$/ && $0 !~ /^\| *(Area|Concept) *\|/ {
         split($0, c, "|")
         area=c[2]; lv=c[3]
         gsub(/^ +| +$/, "", area); gsub(/^ +| +$/, "", lv)
@@ -83,7 +84,7 @@ case "$cmd" in
         printf "%s %-28s — %s\n", glyph(lv), area, label(lv)
       }
       END {
-        if (total == 0) { print "(knowledge map is empty)"; exit }
+        if (total == 0) { print "(concept map is empty)"; exit }
         printf "\n%d of %d regions fully mapped", full, total
         if (rec) printf ", %d explored", rec
         if (cov) printf ", %d sketched", cov
@@ -124,21 +125,24 @@ case "$cmd" in
     else problem "project-plan.md missing"; fi
 
     if [ -f "$prog" ]; then
-      awk '/^## Knowledge map/{s=1;next} /^## /{s=0} s && /^\|/ && !/^\|[-:| ]+$/ && !/^\| *Area/ {print}' "$prog" \
+      awk 'tolower($0) ~ /^## (concept|knowledge) map/{s=1;next} /^## /{s=0} s && /^\|/ && !/^\|[-:| ]+$/ && !/^\| *(Area|Concept) *\|/ {print}' "$prog" \
         | while IFS= read -r row; do
             echo "$row" | grep -Eq 'not seen|covered|recalled|demonstrated' \
-              || echo "PROBLEM: knowledge map row has no valid level: $row"
+              || echo "PROBLEM: concept map row has no valid level: $row"
           done | grep . && problems=1
-      awk '/^## Review queue/{s=1;next} /^## /{s=0} s && /^\|/ && !/^\|[-:| ]+$/ && !/^\| *Concept/ {print}' "$prog" \
+      awk 'tolower($0) ~ /^## review queue/{s=1;next} /^## /{s=0} s && /^\|/ && !/^\|[-:| ]+$/ && !/^\| *Concept *\|/ {print}' "$prog" \
         | while IFS= read -r row; do
             cols=$(echo "$row" | awk -F'|' '{print NF-2}')
             [ "$cols" -eq 5 ] || echo "PROBLEM: review queue row has $cols columns (expected 5): $row"
             echo "$row" | grep -Eq '[0-9]{4}-[0-9]{2}-[0-9]{2}' \
               || echo "PROBLEM: review queue row missing ISO next-review date: $row"
           done | grep . && problems=1
-      grep -Eq '^save: (auto|off)' "$prog" \
-        || problem "learner-progress.md: missing 'save: auto|off' consent line — sessions will re-ask"
     else problem "learner-progress.md missing"; fi
+
+    # Consent is recorded in project-plan.md (SKILL.md); older memory kept it in learner-progress.md
+    consent=0
+    for f in "$map" "$prog"; do [ -f "$f" ] && grep -Eq '^save: (auto|off)' "$f" && consent=1; done
+    [ "$consent" -eq 1 ] || problem "project-plan.md: missing 'save: auto|off' consent line — sessions will re-ask"
 
     if [ "$problems" -eq 0 ]; then echo "OK: memory files are well-formed"; exit 0; fi
     echo "Fix the problems above (edit the files) before trusting resume/scheduling."

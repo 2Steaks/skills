@@ -51,6 +51,8 @@ render() { # $1 = input file -> 0 ok, 1 diagram error, 2 tooling missing/incompl
     return 2
   fi
   [ "$rc" -eq 0 ] && return 0
+  # A parse error is the diagram's fault, even though mermaid's stack trace runs through puppeteer
+  grep -qiE 'parse error|syntax error|lexical error|no diagram type detected|unknowndiagramerror' "$err" && return 1
   # Renderer present but its browser backend is missing = tooling, not the diagram
   grep -qiE 'could not find chrome|puppeteer|browser was not found|error while loading shared libraries' "$err" && return 2
   return 1
