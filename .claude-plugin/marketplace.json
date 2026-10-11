@@ -30,6 +30,13 @@
       "source": "./",
       "strict": false,
       "skills": ["./skills/build-to-learn"]
+    },
+    {
+      "name": "codebase-tutor",
+      "description": "Learn an unfamiliar codebase in terms of the stack you already know: guided tour, coached build, spaced review, Feynman mode and debugging drills.",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/codebase-tutor"]
     }
   ]
 }

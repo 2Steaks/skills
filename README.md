@@ -7,6 +7,7 @@ Skills and mods for Claude Code.
 | [Learning guardrails](#learning-guardrails) | skill + mod | Holds risky or new code until you show you understand it. |
 | [Team deliberation](#team-deliberation) | skill | Puts an idea or decision in front of a panel of independent specialist subagents. |
 | [Build to learn](#build-to-learn) | skill | Learn a new stack by building a project of your own, with Claude as coach. |
+| [Codebase tutor](#codebase-tutor) | skill | Learn an unfamiliar repo in terms of the stack you already know. |
 
 In Claude Code, add this repo as a marketplace once:
 
@@ -54,6 +55,18 @@ Along the way you get attempt-first diff reviews, spaced-review quizzes, an evid
 
 The scripts need bash and git. Audio and diagrams use a local text-to-speech engine and mermaid-cli when they're installed, and fall back to text when they aren't.
 
+## Codebase tutor
+
+[codebase-tutor](skills/codebase-tutor) teaches an unfamiliar repo in terms of the stack you already know. It has five modes: a guided tour (the stack, a repo map, one flow traced end to end, and architectural decisions with evidence kept apart from guesses), a coached build where you write the code, spaced-review quizzes, Feynman mode where you explain it back, and debugging drills with a bug planted on a scratch branch.
+
+Ask it to "teach me this repo" or "quiz me". Progress is saved in `.codebase-tutor/`, so the next session picks up where you left off.
+
+```
+/plugin install codebase-tutor@2steaks-skills
+```
+
+The scripts need bash and git. Audio and diagrams use a local text-to-speech engine and mermaid-cli when they're installed, and fall back to text when they aren't.
+
 ## Without the plugin system
 
 For any agent that reads `skills/`, pick the skills you want:
@@ -62,6 +75,7 @@ For any agent that reads `skills/`, pick the skills you want:
 npx skills add 2Steaks/skills --skill learning-guardrails
 npx skills add 2Steaks/skills --skill team-deliberation
 npx skills add 2Steaks/skills --skill build-to-learn
+npx skills add 2Steaks/skills --skill codebase-tutor
 ```
 
 Or copy a folder from `skills/` into `~/.claude/skills/`. The learning-gate mod needs the plugin system.
