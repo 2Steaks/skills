@@ -86,7 +86,7 @@ Tiers rate the change's *risk*; the record (§2) decides what's new for the user
 - **State and data flow**: who owns state, effects and subscriptions, cache invalidation, global stores, client/server sync.
 - **Contracts and irreversibles**: public APIs, shared types, event formats, config others depend on, deletes, force-pushes, money.
 
-Engagement test: does this change alter how the mechanism *behaves*? A typo fix in `auth.ts` is GO; a new token refresh is GATE. Unsure → one tier up. Rating a change below what its signals suggest needs a reason code in the log (`non-functional-edit`). The signals' deterministic floor is `{skill}/assets/rules.default.json`, or the project's `.learning/rules.json` once one exists.
+Engagement test: does this change alter how the mechanism *behaves*? A typo fix in `auth.ts` is GO; a new token refresh is GATE. Unsure → one tier up. Rating a change below what its signals suggest needs a reason code in the log (`non-functional-edit`). The signals' deterministic floor is the packs in `{skill}/assets/rules/` (one per stack, each reading only its own file types), then your layer in `~/.learning/rules.json`, then the project's in `.learning/rules.json`.
 
 Max two checkpoints per step. More than two categories engaged means the step is too big: split it.
 

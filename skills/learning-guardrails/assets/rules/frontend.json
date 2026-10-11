@@ -1,0 +1,48 @@
+{
+  "pack": "frontend",
+  "about": "React, Vue, Svelte, Angular and the browser: effects, stores, rendering, raw HTML.",
+  "files": ["\\.([mc]?[jt]sx?|vue|svelte|astro|mdx|html?)$"],
+  "categories": {
+    "data": {
+      "diff": [
+        "\\bindexeddb\\b",
+        "invalidateQueries|setQueryData|staleTime|cacheTime|gcTime",
+        "\\b(writeQuery|writeFragment|refetchQueries|invalidatesTags|providesTags)\\b|\\bcache\\.(modify|evict)\\("
+      ]
+    },
+    "security": {
+      "diff": [
+        "dangerouslySetInnerHTML|\\.innerHTML\\s*=",
+        "\\.outerHTML\\s*=|\\binsertAdjacentHTML\\(|\\bdocument\\.write\\(",
+        "\\bv-html\\b|\\{@html\\b|\\[innerHTML\\]|\\bbypassSecurityTrust\\w*\\(",
+        "\\bpostMessage\\("
+      ]
+    },
+    "performance": {
+      "diff": [
+        "\\buseMemo\\b|\\buseCallback\\b|React\\.memo\\b|\\bmemo\\(",
+        "virtuali[sz]",
+        "requestAnimationFrame",
+        "React\\.lazy\\(|\\blazy\\(\\s*\\(\\)\\s*=>|\\bdefineAsyncComponent\\(",
+        "\\bChangeDetectionStrategy\\b|\\btrackBy\\b|\\bshallowRef\\b|\\bwill-change\\b"
+      ]
+    },
+    "state": {
+      "paths": ["(^|/)(store|stores|context|contexts|state)/.*\\.([mc]?[jt]sx?|vue|svelte|astro)$"],
+      "diff": [
+        "\\buse(Layout)?Effect\\(",
+        "\\bcreateContext\\(|\\buseContext\\(",
+        "\\buseReducer\\(|\\bcreateSlice\\(|\\bzustand\\b|\\bredux\\b",
+        "addEventListener\\(",
+        "\\b(local|session)Storage\\b",
+        "\\buseSyncExternalStore\\b",
+        "\\b(jotai|recoil|mobx|pinia|vuex|ngrx|xstate)\\b|\\b(createStore|configureStore|defineStore)\\(",
+        "\\bwatch(Effect)?\\(|\\bon(Mounted|Unmounted|BeforeUnmount)\\(|\\bprovide\\(|\\binject\\(",
+        "\\$effect\\b|\\bonMount\\(|\\bonDestroy\\(",
+        "\\bngOnInit\\b|\\bngOnDestroy\\b|\\btakeUntil(Destroyed)?\\(",
+        "\\beffect\\("
+      ],
+      "diffExact": ["\\b(writable|readable|derived)\\(", "\\b(BehaviorSubject|ReplaySubject)\\b|\\bnew Subject\\b"]
+    }
+  }
+}

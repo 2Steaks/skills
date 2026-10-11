@@ -1,0 +1,47 @@
+{
+  "pack": "php",
+  "about": "PHP: Laravel, Symfony and WordPress.",
+  "files": ["\\.(php|phtml|twig)$"],
+  "categories": {
+    "data": {
+      "diff": [
+        "\\bDB::|\\bSchema::(create|table|drop|dropIfExists|rename)\\b|\\$table->(drop\\w*|renameColumn|index|unique|foreign)\\(",
+        "->(whereRaw|selectRaw|orderByRaw|havingRaw|groupByRaw)\\(|::(where|whereIn|find|findOrFail|destroy|query|firstOrCreate|updateOrCreate|upsert|insert)\\(|::create\\(\\s*\\[",
+        "\\bmysqli_\\w+\\(|\\bpg_query\\(|->(query|prepare|exec)\\(|\\$wpdb->|\\bnew PDO\\(",
+        "\\bCache::(put|forget|forever|remember|flush|tags)\\b|\\bwp_cache_(set|delete)\\(|\\bset_transient\\("
+      ]
+    },
+    "concurrency": {
+      "diff": [
+        "\\bdispatch(_sync|_now)?\\(|->onQueue\\(|\\bShouldQueue\\b|\\bQueue::|\\bBus::(chain|batch)\\b",
+        "\\bCache::lock\\(|->lockForUpdate\\(\\)|->sharedLock\\(\\)|\\bflock\\(",
+        "\\bpcntl_fork\\(|\\bwp_schedule_(single_)?event\\(|->(everyMinute|everyFiveMinutes|hourly|daily|cron)\\("
+      ]
+    },
+    "security": {
+      "diff": [
+        "\\b(exec|shell_exec|system|passthru|proc_open|popen)\\(",
+        "(->(query|exec|prepare|whereRaw|selectRaw|orderByRaw|havingRaw)|\\bDB::(select|statement|insert|update|delete|unprepared))\\(\\s*\"[^\"]*\\$\\w+|\\bmysqli_query\\([^,]+,\\s*\"[^\"]*\\$\\w+",
+        "\\bunserialize\\(|\\bassert\\(\\s*\\$",
+        "\\{!!.*!!\\}|\\|\\s*raw\\b|\\becho\\s+\\$_(GET|POST|REQUEST|COOKIE)",
+        "\\$_(GET|POST|REQUEST|COOKIE|FILES|SERVER)\\b|\\bmove_uploaded_file\\(|\\bextract\\(\\s*\\$_",
+        "\\bpassword_(hash|verify)\\(|\\bcsrf_token\\(|\\bVerifyCsrfToken\\b|\\bwp_verify_nonce\\(|\\bcheck_admin_referer\\(|\\bcurrent_user_can\\(|\\bGate::|->middleware\\(\\s*\\[?['\"](auth|can)",
+        "\\b(openssl_\\w+|hash_hmac|random_bytes|sodium_\\w+)\\("
+      ]
+    },
+    "performance": {
+      "diff": ["::with\\(|->(load|loadMissing|withCount)\\(", "->(chunk|chunkById|lazy|lazyById|cursor)\\(", "\\bopcache_|\\bapcu_"]
+    },
+    "state": {
+      "diff": [
+        "\\$_SESSION\\b|\\bsession\\(\\)->(put|forget|flush|regenerate)\\b|\\bSession::(put|forget|flush|regenerate)\\b",
+        "\\bglobal\\s+\\$|\\$GLOBALS\\b|\\bstatic\\s+\\$\\w+\\s*=",
+        "\\bEvent::(listen|dispatch)\\b|\\bevent\\(\\s*new\\b|->observe\\(|\\badd_(action|filter)\\("
+      ]
+    },
+    "contracts": {
+      "paths": ["(^|/)composer\\.json$", "(^|/)routes/(api|web|channels)\\.php$", "(^|/)app/Http/Resources/"],
+      "diff": ["\\bRoute::(get|post|put|patch|delete|resource|apiResource|any|match|group|prefix)\\b", "\\bregister_rest_route\\(|#\\[Route\\("]
+    }
+  }
+}

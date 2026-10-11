@@ -2,16 +2,16 @@
 // analyse.mjs: the self-evaluation report, from .learning/events.jsonl and the concept record.
 // Deterministic: no network, randomness or AI. Numbers are prompts for review, not verdicts:
 // a completed checkpoint doesn't prove mastery, and a high override rate isn't automatically bad.
+// With --git, the rules in force (packs, then ~/.learning/rules.json, then .learning/rules.json; see
+// rules.mjs) look for risky commits; --rules puts one more file on top.
 // Usage: node analyse.mjs [--write] [--git <days>] [--rules <file>]
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { loadRules, signals } from "./bench.mjs";
 import { CATS, eventsPath, isMain, parseArgs, projectRoot, today } from "./lib.mjs";
 import { list } from "./record.mjs";
+import { loadRules, parseDiff, signals } from "./rules.mjs";
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
 const day = (e) => String(e.d ?? "").slice(0, 10);
 const tally = (items) => items.reduce((m, k) => ((m[k] = (m[k] ?? 0) + 1), m), {});
 const show = (m) => Object.entries(m).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(", ") || "none";
@@ -120,18 +120,17 @@ export function report(events, concepts, { bad = 0, misses = null } = {}) {
 export function gitMisses(root, days, rules, events) {
   let raw;
   try {
-    raw = execFileSync("git", ["-C", root, "log", `--since=${days}.days`, "--date=short", "--format=@@commit %H %ad", "-p", "--unified=0"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+    raw = execFileSync("git", ["-C", root, "log", `--since=${days}.days`, "--date=short", "--format=@@commit %H %ad", "-p", "--unified=0", "--no-color", "--src-prefix=a/", "--dst-prefix=b/"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   } catch {
     return [];
   }
   const gated = new Set(events.filter((e) => e.tier === "gate" || e.e === "gate_open").map(day));
   const misses = [];
   for (const chunk of raw.split(/^@@commit /m).filter(Boolean)) {
-    const [head, ...lines] = chunk.split("\n");
+    const [head, ...rest] = chunk.split("\n");
     const [sha, date] = head.split(" ");
-    const files = lines.filter((l) => l.startsWith("+++ b/")).map((l) => l.slice(6));
-    const changed = lines.filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l)).map((l) => l.slice(1));
-    const cats = signals(files, changed, rules);
+    const { files, lines } = parseDiff(rest.join("\n"));
+    const cats = signals(files, lines, rules);
     if (cats.length && !gated.has(date)) misses.push({ sha, date, cats });
   }
   return misses;
@@ -143,8 +142,7 @@ if (isMain(import.meta.url)) {
   const { events, bad } = readEvents(eventsPath(root));
   let misses = null;
   if (flags.git) {
-    const local = path.join(root, ".learning", "rules.json");
-    const rules = loadRules(flags.rules ?? (fs.existsSync(local) ? local : path.join(HERE, "..", "assets", "rules.default.json")));
+    const rules = loadRules({ root, extra: flags.rules === undefined ? [] : [].concat(flags.rules) });
     misses = gitMisses(root, Number(flags.git === true ? 30 : flags.git), rules, events);
   }
   const text = report(events, list(), { bad, misses });

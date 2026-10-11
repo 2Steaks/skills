@@ -1,0 +1,48 @@
+{
+  "pack": "go",
+  "about": "Go: database/sql, GORM, goroutines and channels, net/http.",
+  "files": ["\\.go$"],
+  "categories": {
+    "data": {
+      "diff": [
+        "\\.(Query|QueryRow|Exec|Prepare)(Context)?\\(\\s*[^)\\s]",
+        "\\.BeginTx\\(|\\bdb\\.Begin\\(\\)|\\btx\\.(Commit|Rollback)\\(",
+        "\\bsql\\.Open\\(|\\bsqlx\\.|\\bpgx\\w*\\.|\\bgorm\\.",
+        "\\bdb\\.(Create|Save|Delete|Model|Where|First|Find|Update|Updates|Raw|AutoMigrate)\\(",
+        "\\bredis\\.|\\brdb\\.(Get|Set|Del|Expire|HSet|Publish)\\("
+      ]
+    },
+    "concurrency": {
+      "diff": [
+        "\\bgo\\s+(func\\b|[\\w.]+\\()",
+        "\\bchan\\b|<-",
+        "^\\s*select\\s*\\{",
+        "\\bsync\\.(Mutex|RWMutex|WaitGroup|Once|Cond|Map|Pool)\\b|\\batomic\\.",
+        "\\bcontext\\.With(Cancel|Timeout|Deadline|CancelCause)\\b|\\bctx\\.Done\\(\\)",
+        "\\berrgroup\\b|\\bsemaphore\\.",
+        "\\btime\\.(After|AfterFunc|Tick|NewTicker|NewTimer)\\("
+      ]
+    },
+    "security": {
+      "diff": [
+        "\\bexec\\.Command(Context)?\\(|\"os/exec\"",
+        "\\btemplate\\.(HTML|JS|URL|CSS)\\(|\"text/template\"",
+        "\\bInsecureSkipVerify\\b|\\bunsafe\\.",
+        "\"crypto/[\\w/]+\"|\\bbcrypt\\.|\\bjwt\\.",
+        "\\bhttp\\.SetCookie\\(|\\.Header\\(\\)\\.Set\\(\\s*\"(Access-Control|Set-Cookie|Authorization)"
+      ],
+      "diffExact": ["Sprintf\\(\\s*[\"`].*\\b(SELECT|INSERT|UPDATE|DELETE|WHERE)\\b"]
+    },
+    "performance": {
+      "diff": ["\\bsync\\.Pool\\b|\\bpprof\\b|\\bruntime\\.(GC|GOMAXPROCS|SetFinalizer)\\b"]
+    },
+    "state": {
+      "diff": ["\\bcontext\\.WithValue\\(", "\\bsync\\.Once\\b", "^var\\s+\\w+\\s*=\\s*(map|make|&|\\[\\])"]
+    },
+    "contracts": {
+      "paths": ["(^|/)go\\.(mod|work)$"],
+      "diff": ["`json:\""],
+      "diffExact": ["\\b(HandleFunc|Handle)\\(\\s*\"/|\\.(GET|POST|PUT|PATCH|DELETE|Get|Post|Put|Patch|Delete|Group|Route)\\(\\s*\"/"]
+    }
+  }
+}

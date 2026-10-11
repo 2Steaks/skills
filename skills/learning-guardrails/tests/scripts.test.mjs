@@ -170,23 +170,119 @@ test("log refuses what the schema doesn't allow", () => {
 
 // ---- bench ----
 
-test("bench: every seed case passes on the default rules", () => {
+const ASSETS = path.join(SCRIPTS, "..", "assets");
+const ABORT = "\\bAbortController\\b|\\.abort\\(\\)|\\bsignal\\s*[:,)}]";
+const writeJson = (file, data) => {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, typeof data === "string" ? data : JSON.stringify(data));
+};
+
+test("bench: every seed case passes on the shipped packs", () => {
   const w = world();
   const r = w.run("bench.mjs");
   assert.equal(r.code, 0, r.out);
-  assert.match(r.out, /26 cases · 26 pass · 0 fail/);
+  assert.match(r.out, /^rules: assets\/rules \(\d+ packs\)$/m);
+  const [, total, passed] = r.out.match(/(\d+) cases · (\d+) pass · 0 fail/);
+  assert.equal(total, passed);
+  assert.ok(Number(total) > 100, total);
+});
+
+test("bench: every pack ships with its own benchmark cases", () => {
+  const packs = fs.readdirSync(path.join(ASSETS, "rules")).filter((f) => f.endsWith(".json"));
+  assert.ok(packs.length >= 12, packs.join(", "));
+  for (const pack of packs) assert.ok(fs.existsSync(path.join(ASSETS, "benchmarks", pack.replace(/\.json$/, ".jsonl"))), `cases for ${pack}`);
 });
 
 test("bench: a rule change that loosens the gate is flagged and fails", () => {
   const w = world();
-  const rules = JSON.parse(fs.readFileSync(path.join(SCRIPTS, "..", "assets", "rules.default.json"), "utf8"));
-  rules.categories.concurrency.diff = [];
   const proposed = path.join(w.base, "proposed.json");
-  fs.writeFileSync(proposed, JSON.stringify(rules));
+  writeJson(proposed, { version: 2, remove: { concurrency: { diff: [ABORT] } } });
   const r = w.run("bench.mjs", ["--proposed", proposed]);
   assert.equal(r.code, 1);
   assert.match(r.out, /MORE PERMISSIVE  gate-concurrency-abort: gate\/check → go\/no check/);
   assert.match(r.out, /case\(s\) fail/);
+});
+
+test("bench: your layer in ~/.learning applies in every project, and the project's goes on top", () => {
+  const w = world();
+  writeJson(path.join(w.home, ".learning", "rules.json"), { version: 2, remove: { concurrency: { diff: [ABORT] } } });
+  const mine = w.run("bench.mjs");
+  assert.equal(mine.code, 1);
+  assert.match(mine.out, /^rules: assets\/rules \(\d+ packs\) \+ ~\/\.learning\/rules\.json$/m);
+  assert.match(mine.out, /FAIL  gate-concurrency-abort/);
+  writeJson(path.join(w.proj, ".learning", "rules.json"), { version: 2, categories: { concurrency: { diff: ["\\bAbortController\\b"] } } });
+  const both = w.run("bench.mjs");
+  assert.equal(both.code, 0, both.out);
+  assert.match(both.out, /\+ ~\/\.learning\/rules\.json \+ \.\/\.learning\/rules\.json$/m);
+});
+
+test("bench: an old full copy in a project replaces everything below it, as before", () => {
+  const w = world();
+  writeJson(path.join(w.proj, ".learning", "rules.json"), { version: 1, categories: { security: { diff: ["dangerouslySetInnerHTML"] } } });
+  const r = w.run("bench.mjs");
+  assert.equal(r.code, 1);
+  assert.match(r.out, /^rules: \.\/\.learning\/rules\.json$/m);
+  assert.match(r.out, /PASS  gate-security-html/);
+  assert.match(r.out, /FAIL  py-security-shell/);
+});
+
+test("bench: layers say when a removal matches nothing, and refuse a misspelt category", () => {
+  const w = world();
+  const layer = path.join(w.home, ".learning", "rules.json");
+  writeJson(layer, { version: 2, remove: { security: { diff: ["\\bnot-a-pattern\\b"] } } });
+  assert.match(w.run("bench.mjs").out, /note: .*removes security\.diff \\bnot-a-pattern\\b, which nothing below it has/);
+  writeJson(layer, { version: 2, categories: { secruity: { diff: ["x"] } } });
+  const bad = w.run("bench.mjs");
+  assert.equal(bad.code, 1);
+  assert.match(bad.err, /unknown category "secruity"/);
+});
+
+test("bench: a layer can make comment lines count again", () => {
+  const w = world();
+  assert.match(w.run("bench.mjs").out, /PASS  core-go-comment-in-code/);
+  writeJson(path.join(w.home, ".learning", "rules.json"), { version: 2, go: { commentOnly: false } });
+  const r = w.run("bench.mjs");
+  assert.match(r.out, /FAIL  go-comment-only/);
+  assert.match(r.out, /FAIL  core-go-comment-in-code/);
+});
+
+test("parseDiff keeps each line with its file, deleted files and paths with spaces included", async () => {
+  const { parseDiff } = await import(path.join(SCRIPTS, "rules.mjs"));
+  const diff = [
+    "diff --git a/db/migrations/0001_init.sql b/db/migrations/0001_init.sql",
+    "deleted file mode 100644",
+    "--- a/db/migrations/0001_init.sql",
+    "+++ /dev/null",
+    "@@ -1,2 +0,0 @@",
+    "-CREATE TABLE runs (id int);",
+    "--- a removed SQL comment",
+    "diff --git a/release notes/v2.md b/release notes/v2.md",
+    "--- a/release notes/v2.md\t",
+    "+++ b/release notes/v2.md\t",
+    "@@ -0,0 +1 @@",
+    "+- Retry the socket",
+  ].join("\n");
+  const { files, lines } = parseDiff(diff);
+  assert.deepEqual(files, ["db/migrations/0001_init.sql", "release notes/v2.md"]);
+  assert.deepEqual(lines, [
+    { file: "db/migrations/0001_init.sql", text: "CREATE TABLE runs (id int);" },
+    { file: "db/migrations/0001_init.sql", text: "-- a removed SQL comment" },
+    { file: "release notes/v2.md", text: "- Retry the socket" },
+  ]);
+});
+
+test("bench: your cases add to the shipped ones, and a case with the same id replaces it", () => {
+  const w = world();
+  const base = w.run("bench.mjs").out.match(/(\d+) cases/)[1];
+  const cases = [
+    { id: "go-copy-label", kind: "trivial", files: ["src/components/StartButton.tsx"], diff: ["+  <Button>Go</Button>"], expected: { tier: "gate" } },
+    { id: "mine-websocket", kind: "high-risk", files: ["src/live.ts"], diff: ["+  const ws = new WebSocket(url)"], record: { status: "none" }, expected: { tier: "gate", cats: ["concurrency"] } },
+  ];
+  writeJson(path.join(w.home, ".learning", "benchmarks", "cases.jsonl"), cases.map((c) => JSON.stringify(c)).join("\n") + "\n");
+  const r = w.run("bench.mjs");
+  assert.match(r.out, new RegExp(`${Number(base) + 1} cases · ${Number(base)} pass · 1 fail`));
+  assert.match(r.out, /FAIL  go-copy-label/);
+  assert.match(r.out, /PASS  mine-websocket/);
 });
 
 // ---- analyse ----
@@ -222,6 +318,23 @@ test("analyse --git lists a risky commit with no gate that day", () => {
   git("commit", "-qm", "auth");
   const r = w.run("analyse.mjs", ["--git", "7"]);
   assert.match(r.out, /## Possible misses \(git\)\n- [0-9a-f]{8} \d{4}-\d{2}-\d{2} security: no gate that day/);
+});
+
+test("analyse --git reads each file with its own stack's rules, and skips prose", () => {
+  const w = world();
+  w.run("setup.mjs");
+  const git = (...args) => execFileSync("git", ["-C", w.proj, "-c", "user.email=t@t", "-c", "user.name=t", ...args]);
+  fs.writeFileSync(path.join(w.proj, "src", "parse.ts"), "export const first = (re, s) => re.exec(s)\n");
+  fs.writeFileSync(path.join(w.proj, "CHANGELOG.md"), "- Retry the WebSocket with a token\n");
+  git("add", "-A");
+  git("commit", "-qm", "harmless");
+  assert.match(w.run("analyse.mjs", ["--git", "7"]).out, /## Possible misses \(git\)\n- none found/);
+  fs.mkdirSync(path.join(w.proj, "app"), { recursive: true });
+  fs.writeFileSync(path.join(w.proj, "app", "run.py"), "subprocess.run(cmd, shell=True)\n");
+  git("add", "-A");
+  git("commit", "-qm", "shell");
+  const r = w.run("analyse.mjs", ["--git", "7"]);
+  assert.match(r.out, /## Possible misses \(git\)\n- [0-9a-f]{8} \d{4}-\d{2}-\d{2} security: no gate that day\. Review, not a verdict\.$/);
 });
 
 test("the ISO week is right", async () => {

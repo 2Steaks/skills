@@ -1,43 +1,31 @@
 #!/usr/bin/env node
 // bench.mjs: runs the benchmark cases against the triage rules, the record logic and the
-// override policy. With --proposed it compares two rule sets and flags any case that became
-// more permissive (risk under-tiered, a needed check dropped) or more intrusive.
+// override policy. With --proposed it compares the rules in force with the same rules plus one more
+// file, and flags any case that became more permissive (risk under-tiered, a needed check dropped)
+// or more intrusive.
+// Rules: every pack in assets/rules/, then ~/.learning/rules.json, then .learning/rules.json (rules.mjs).
+// Cases: every assets/benchmarks/*.jsonl, then ~/.learning/benchmarks/cases.jsonl, then the project's;
+// a case with an id already seen replaces it.
 // Deterministic: no network, randomness or AI. The engagement judgement stays with Claude.
-// Usage: node bench.mjs [--rules <file>] [--cases <file>] [--proposed <rules file>]
+// Usage: node bench.mjs [--rules <file>] [--cases <file>] [--proposed <file>]
+//   --rules and --proposed take a pack (adds or replaces it), a layer ("version": 2) or an old full copy.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { CATS, fail, isMain, parseArgs, projectRoot } from "./lib.mjs";
+import { home, isMain, parseArgs, projectRoot } from "./lib.mjs";
+import { describe, isComment, loadRules, signals } from "./rules.mjs";
+
+export { loadRules, matches, parseDiff, signals } from "./rules.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+const CASES = path.join(HERE, "..", "assets", "benchmarks");
 const RANK = { go: 0, check: 1, gate: 2 };
-
-export function loadRules(file) {
-  const raw = JSON.parse(fs.readFileSync(file, "utf8"));
-  const compile = (list = [], flags = "i") => list.map((p) => new RegExp(p, flags));
-  const categories = {};
-  for (const cat of CATS) {
-    const c = raw.categories?.[cat] ?? {};
-    categories[cat] = { paths: compile(c.paths), diff: [...compile(c.diff), ...compile(c.diffExact, "")] };
-  }
-  return { categories, commentOnly: raw.go?.commentOnly !== false };
-}
 
 // A changed line without its +/- marker; diff headers dropped.
 export const changedLines = (diff) =>
   (Array.isArray(diff) ? diff : String(diff ?? "").split("\n"))
     .filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l))
     .map((l) => l.slice(1));
-
-const isComment = (l) => /^\s*$|^\s*(\/\/|\/\*|\*|\*\/|#|<!--)/.test(l);
-
-// The risk categories a change's files and changed lines point at.
-export function signals(files = [], lines = [], rules) {
-  return CATS.filter((cat) => {
-    const { paths, diff } = rules.categories[cat];
-    return files.some((f) => paths.some((re) => re.test(f))) || lines.some((l) => diff.some((re) => re.test(l)));
-  });
-}
 
 export function triage(c, rules) {
   const lines = changedLines(c.diff);
@@ -87,23 +75,34 @@ export const mismatches = (expected, got) =>
 export const loadCases = (file) =>
   fs.readFileSync(file, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
 
-function defaults() {
-  const root = projectRoot();
-  const local = (name) => path.join(root, ".learning", name);
-  return {
-    rules: fs.existsSync(local("rules.json")) ? local("rules.json") : path.join(HERE, "..", "assets", "rules.default.json"),
-    cases: fs.existsSync(local("benchmarks/cases.jsonl")) ? local("benchmarks/cases.jsonl") : path.join(HERE, "..", "assets", "benchmarks.jsonl"),
-  };
+// The case files in force: the shipped ones, then yours, then the project's.
+export function caseFiles(root = projectRoot(), dir = CASES) {
+  const shipped = fs.readdirSync(dir).filter((f) => f.endsWith(".jsonl")).sort().map((f) => path.join(dir, f));
+  const mine = path.join(home(), ".learning", "benchmarks", "cases.jsonl");
+  const project = path.join(root, ".learning", "benchmarks", "cases.jsonl");
+  return [...shipped, ...[...new Set([mine, project])].filter((f) => fs.existsSync(f))];
+}
+
+// Every case from those files; a later case with an id already seen replaces it.
+export function casesInForce(files) {
+  const byId = new Map();
+  for (const file of files) for (const c of loadCases(file)) byId.set(c.id, c);
+  return [...byId.values()];
 }
 
 if (isMain(import.meta.url)) {
   const { flags } = parseArgs(process.argv.slice(2));
-  const d = defaults();
-  const rulesFile = flags.rules ?? d.rules;
-  const cases = loadCases(flags.cases ?? d.cases);
-  const current = loadRules(rulesFile);
+  const root = projectRoot();
+  const extra = flags.rules === undefined ? [] : [].concat(flags.rules);
+  const current = loadRules({ root, extra });
+  const files = flags.cases === undefined ? caseFiles(root) : [].concat(flags.cases);
+  const cases = casesInForce(files);
+  const shipped = files.filter((f) => path.dirname(f) === CASES);
+  const others = files.filter((f) => path.dirname(f) !== CASES).map((f) => f.replace(root, ".").replace(home(), "~"));
+  const sources = [...(shipped.length ? [`assets/benchmarks (${shipped.length} files)`] : []), ...others];
+  console.log(`rules: ${describe(current, root)}\ncases: ${sources.join(" + ")}\n`);
+  for (const w of current.warnings) console.log(`note: ${w}`);
   let failed = 0;
-  console.log(`rules: ${rulesFile}\ncases: ${flags.cases ?? d.cases}\n`);
   for (const c of cases) {
     const problems = mismatches(c.expected, evaluate(c, current));
     if (problems.length) failed++;
@@ -112,8 +111,9 @@ if (isMain(import.meta.url)) {
   console.log(`\n${cases.length} cases · ${cases.length - failed} pass · ${failed} fail`);
 
   if (flags.proposed) {
-    const proposed = loadRules(flags.proposed);
+    const proposed = loadRules({ root, extra: [...extra, flags.proposed] });
     console.log(`\nproposed: ${flags.proposed}`);
+    for (const w of proposed.warnings.filter((w) => !current.warnings.includes(w))) console.log(`note: ${w}`);
     let proposedFails = 0;
     for (const c of cases.filter((x) => !x.override)) {
       const a = evaluate(c, current);

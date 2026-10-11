@@ -18,13 +18,16 @@ Optimise for learning, retained understanding, engineering independence and usef
   - `diff_review` mismatches, as missed risk or over-triage
   - record drift: passes with no evidence line that day
   - with `--git`, commits that carry GATE signals on a day with no gate: possible misses for review
-- `scripts/bench.mjs [--rules <file>] [--cases <file>] [--proposed <rules file>]` runs the benchmark cases against the triage rules, the record logic and the override policy. With `--proposed` it lists every case that became **more permissive** (risk under-tiered, a needed check dropped) or **more intrusive** (GO over-tiered, a mastered concept retaught), and fails if any case's expectation breaks.
+- `scripts/bench.mjs [--rules <file>] [--cases <file>] [--proposed <file>]` runs the benchmark cases against the triage rules, the record logic and the override policy. `--rules` and `--proposed` put one more file on top of the rules in force: a pack, a layer or an old full copy. With `--proposed` it lists every case that became **more permissive** (risk under-tiered, a needed check dropped) or **more intrusive** (GO over-tiered, a mastered concept retaught), and fails if any case's expectation breaks.
 
 Both are deterministic: no network, randomness or AI. Subjective questions (does this checkpoint force reasoning?) get explicit criteria instead: it needs the why, is tied to the real code, asks one question, is answerable in 1–3 sentences, and can't be passed with a nod. Review against real examples, not another model's opinion alone.
 
 ## Rules and cases
 
-- The defaults ship in `assets/rules.default.json` and `assets/benchmarks.jsonl`. To tune them for a project, copy them to `.learning/rules.json` and `.learning/benchmarks/cases.jsonl`. The scripts prefer those copies when they exist.
+- The defaults ship as packs in `assets/rules/`, one per stack, with cases in `assets/benchmarks/`. Every pack loads in every project: its path patterns see every changed file, its diff patterns only its own file types. Comment lines and ignored files (prose, lock files, vendored and generated code) don't count. `assets/rules/README.md` has the format.
+- Tune in layers. `~/.learning/rules.json` is yours, for every project: tuning goes there by default. A project's `.learning/rules.json` is only for what's true of that codebase alone. A layer adds patterns and removes them by exact string: `{"version": 2, "categories": {…}, "remove": {…}}`. A file without `"version": 2` is an old full copy and replaces everything below it.
+- Cases layer the same way: `~/.learning/benchmarks/cases.jsonl`, then the project's. A case with an id already seen replaces it.
+- A new stack is a new pack plus its cases: one per category it covers, and GO cases for its lookalikes. `bench.mjs --proposed <pack>` shows what it changes.
 - Rules give the deterministic floor: candidate categories from paths and changed lines, and comment-only diffs as GO. Your engagement judgement stays separate, and is logged when it lowers a tier.
 - Cases are synthetic only: tiny made-up diffs, never real source. Seed at least two per kind (trivial, familiar same context, familiar variation, unfamiliar low-risk, high-risk per category, unexpected complexity, override) whenever the rules gain a category.
 - Expected values in cases are core rules. Changing them needs the user's yes, like any rule change.
@@ -36,7 +39,7 @@ Both are deterministic: no network, randomness or AI. Subjective questions (does
 3. **Propose**: one specific change to detection rules, checkpoint selection, the record model or enforcement, written to `.learning/proposals/<date>-<slug>.md`.
 4. **Test**: `bench.mjs --proposed <file>`: current vs proposed.
 5. **Review**: show the user the change, the evidence, the benchmark diff, the trade-offs and how to revert it, in ≤10 lines.
-6. **Apply**: only on an explicit yes. Keep it reversible: log old → new in `.learning/rules-changelog.md`. Changes to this skill itself go to the user as a proposed edit.
+6. **Apply**: only on an explicit yes. Keep it reversible: log old → new in a `rules-changelog.md` beside the layer you changed. Changes to this skill itself go to the user as a proposed edit.
 7. **Reassess**: the next report checks the targeted metric moved.
 
 ## Who may change what

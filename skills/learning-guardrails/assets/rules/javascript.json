@@ -1,0 +1,40 @@
+{
+  "pack": "javascript",
+  "about": "JavaScript and TypeScript, in the browser or on Node: promises, timers, child processes, ORMs.",
+  "files": ["\\.([mc]?[jt]sx?|vue|svelte|astro|mdx)$"],
+  "categories": {
+    "data": {
+      "paths": ["\\.prisma$", "(^|/)schema\\.(ts|js)$", "(^|/)drizzle/"],
+      "diff": [
+        "\\bprisma\\.\\w+\\.(find\\w*|create\\w*|update\\w*|delete\\w*|upsert|aggregate|groupBy|count)\\(|\\$(queryRaw|executeRaw)(Unsafe)?\\b",
+        "\\.(insertOne|insertMany|updateOne|updateMany|replaceOne|deleteOne|deleteMany|createMany|upsert|findOneAndUpdate|findOneAndDelete|bulkWrite)\\(",
+        "\\bknex\\(|\\bknex\\.raw\\(|\\bsequelize\\.query\\(|\\.raw\\(\\s*[`'\"]|\\.createQueryBuilder\\(|\\bdb\\.(select|insert|update|delete)\\(",
+        "\\bioredis\\b|\\bredis\\.(get|set|del|expire|hset|hget|publish|multi)\\("
+      ]
+    },
+    "concurrency": {
+      "diff": [
+        "Promise\\.(all|race|any|allSettled)\\b",
+        "\\bAbortController\\b|\\.abort\\(\\)|\\bsignal\\s*[:,)}]",
+        "\\bset(Timeout|Interval)\\(",
+        "\\bworker_threads\\b|\\bAtomics\\.|\\bSharedArrayBuffer\\b",
+        "\\bsetImmediate\\(|process\\.nextTick\\("
+      ]
+    },
+    "security": {
+      "diff": [
+        "new Function\\(",
+        "\\$(queryRaw|executeRaw)Unsafe\\(|\\.(query|raw|execute)\\(\\s*`[^`]*\\$\\{",
+        "\\bcrypto\\.subtle\\b",
+        "\\bchild_process\\b|(^|[^.\\w])(exec|execSync|spawn|spawnSync|execFile|execFileSync)\\(|\\.(execSync|spawn|spawnSync|execFile|execFileSync)\\(",
+        "\\bjsonwebtoken\\b|\\bvm\\.(runIn\\w+|Script)\\b"
+      ]
+    },
+    "performance": {
+      "diff": ["\\.(map|filter|reduce)\\(.*\\.(map|filter|reduce)\\("]
+    },
+    "contracts": {
+      "paths": ["\\.d\\.ts$", "(^|/)package\\.json$"]
+    }
+  }
+}
