@@ -1,6 +1,6 @@
 # The fallback gate: a Claude Code hook
 
-Use this only when the learning-gate mod isn't on (SKILL.md §12) and the user said yes to the edit gate (§11). The mod does all of this and more; with it, skip this file. Never pin the skill on (no CLAUDE.md line): it's opt-in, loaded only when the user calls it.
+Use this only when the learning-gate mod isn't on (SKILL.md §12) and the user said yes to the edit gate (§11). Never pin the skill on (no CLAUDE.md line): it's opt-in, loaded only when the user calls it.
 
 ## Install the edit gate
 
@@ -17,4 +17,4 @@ Use this only when the learning-gate mod isn't on (SKILL.md §12) and the user s
 
 ## Removing it
 
-Removing the hook is the user's call, made by them: `node ~/.claude/hooks/learning-gate.mjs --uninstall`. Never run it yourself, and never edit the hook out of settings. If they ask how, give the command.
+Removing the hook is the user's call: `node ~/.claude/hooks/learning-gate.mjs --uninstall`. Never run it yourself, and never edit the hook out of settings. If they ask how, give the command.

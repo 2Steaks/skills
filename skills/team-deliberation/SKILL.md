@@ -5,7 +5,7 @@ description: "Orchestrate a real multi-agent deliberation on an idea, proposal, 
 
 # Team Deliberation
 
-You are the **orchestrator**. You do not role-play the specialists. You frame the problem, pick the specialists, dispatch them as **separate subagents with independent context**, route their structured outputs between stages, and hand everything to a **separate synthesizer agent**.
+You are the **orchestrator** and never role-play the specialists. Frame the problem, pick the specialists, dispatch them as **separate subagents with independent context**, route their structured outputs between stages, and hand everything to a **separate synthesizer agent**.
 
 The point: turn "one Claude pretending to be several people" into independent analysis → structured cross-examination → evidence gathering → synthesis that keeps real dissent.
 
@@ -102,7 +102,7 @@ Classify each:
 - **predictive** — only the world can answer → becomes an experiment
 - **values / priority** — legitimate trade-off, no fact settles it → goes to synthesis as a judgment call, positions preserved
 
-Do not resolve anything here. You are mapping, not judging.
+Don't resolve anything here: you're mapping, not judging.
 
 ---
 
@@ -373,10 +373,10 @@ Paste the relevant charter verbatim into each subagent prompt. Each charter give
 
 ## Quality bar
 
-- Stage 2 outputs never reference each other. Stage 3 outputs must.
-- Every fact has a source. Assumptions have a test. Speculation is labelled.
-- When a codebase or docs exist, claims about them cite files — hypothetical architecture is a failed analysis.
-- At least one claim revised or withdrawn across the run, with a cited cause. Zero revisions means the challenge round didn't bite.
+- Stage 2 outputs never reference each other; Stage 3 outputs must.
+- Facts have a source, assumptions a test, speculation a label.
+- With a codebase or docs, claims about them cite files: hypothetical architecture is a failed analysis.
+- At least one claim revised or withdrawn across the run, with a cited cause. Zero means the challenge round didn't bite.
 - Factual disputes end in investigation results, not louder argument.
-- The report lets a reader who wasn't there see exactly why each position is held and what would settle it.
-- Don't run Deep when Standard would do. Don't run anything when a direct answer would do.
+- A reader who wasn't there can see exactly why each position is held and what would settle it.
+- No Deep run when Standard would do; no run when a direct answer would do.

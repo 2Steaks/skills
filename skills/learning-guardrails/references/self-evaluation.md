@@ -6,7 +6,7 @@ Read this before proposing any change to the guardrails. SKILL.md §10 says when
 
 Optimise for learning, retained understanding, engineering independence and useful velocity, never checkpoint counts. A completed checkpoint doesn't prove mastery. A high override rate doesn't automatically mean the workflow is broken. Every number in the report is a prompt for review, not a verdict.
 
-**Success over time**: fewer introductory lessons as knowledge grows; familiar concepts caught in genuinely new contexts; meaningful complexity caught more reliably; fewer unnecessary interruptions; GATE still enforceable where it matters; your own performance and limits increasingly visible. The aim is the user's growing ability to understand and own what they build, not compliance with this skill.
+**Success over time**: fewer introductory lessons as knowledge grows; familiar concepts caught in genuinely new contexts; meaningful complexity caught more reliably; fewer unnecessary interruptions; GATE still enforceable where it matters; your own performance and limits increasingly visible.
 
 ## The scripts
 
@@ -24,7 +24,7 @@ Both are deterministic: no network, randomness or AI. Subjective questions (does
 
 ## Rules and cases
 
-- The defaults ship as packs in `assets/rules/`, one per stack, with cases in `assets/benchmarks/`. Every pack loads in every project: its path patterns see every changed file, its diff patterns only its own file types. Comment lines and ignored files (prose, lock files, vendored and generated code) don't count. `assets/rules/README.md` has the format.
+- Defaults: one pack per stack in `assets/rules/` (format in `assets/rules/README.md`), cases in `assets/benchmarks/`. Every pack loads in every project: path patterns see every changed file, diff patterns only the pack's own file types. Comment lines and ignored files (prose, lock files, vendored and generated code) don't count.
 - Tune in layers. `~/.learning/rules.json` is yours, for every project: tuning goes there by default. A project's `.learning/rules.json` is only for what's true of that codebase alone. A layer adds patterns and removes them by exact string: `{"version": 2, "categories": {…}, "remove": {…}}`. A file without `"version": 2` is an old full copy and replaces everything below it.
 - Cases layer the same way: `~/.learning/benchmarks/cases.jsonl`, then the project's. A case with an id already seen replaces it.
 - A new stack is a new pack plus its cases: one per category it covers, and GO cases for its lookalikes. `bench.mjs --proposed <pack>` shows what it changes.
