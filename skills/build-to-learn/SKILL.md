@@ -120,4 +120,4 @@ Runs well on a fast mid-tier model. Offer a switch (as numbered options, once pe
 
 ## Maintaining the toolkit
 
-`tests/test_scripts.sh` self-tests every bundled script (~48 checks) against a throwaway fixture. Run it after any script change.
+`tests/test_scripts.sh` self-tests every bundled script (~51 checks) against a throwaway fixture. Run it after any script change.

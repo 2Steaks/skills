@@ -30,12 +30,13 @@ case "$cmd" in
 
   promote)
     iv="${1:?usage: progress.sh promote <interval>}"
-    out="${LADDER[${#LADDER[@]}-1]}"
+    out=""
     for i in "${!LADDER[@]}"; do
       if [ "${LADDER[$i]}" = "$iv" ]; then
         n=$((i+1)); [ "$n" -lt "${#LADDER[@]}" ] && out="${LADDER[$n]}" || out="${LADDER[$i]}"
       fi
     done
+    [ -n "$out" ] || die "interval must be one of: ${LADDER[*]}"
     echo "$out (next review: $(iso_plus_days "${out%d}"))"
     ;;
 

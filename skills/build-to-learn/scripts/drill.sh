@@ -56,8 +56,11 @@ case "$cmd" in
     orig_branch=$(grep '^orig_branch=' "$state" | cut -d= -f2)
     orig_head=$(grep '^orig_head=' "$state" | cut -d= -f2)
 
-    if [ -n "$(git status --porcelain)" ] && [ "$force" -ne 1 ]; then
-      die "uncommitted changes on the drill branch (the learner's work). Re-run with --force to discard them — confirm with the learner first"
+    if [ -n "$(git status --porcelain)" ]; then
+      [ "$force" -eq 1 ] || die "uncommitted changes on the drill branch (the learner's work). Re-run with --force to discard them — confirm with the learner first"
+      # --force discards the learner's drill-branch work, new files included, so none of it follows us back
+      [ "$(git rev-parse --abbrev-ref HEAD)" = "$branch" ] || die "not on the drill branch $branch — nothing discarded; switch back to it first"
+      { git reset -q --hard && git clean -fdq; } || die "could not discard the drill-branch changes"
     fi
 
     git switch "$orig_branch" >/dev/null 2>&1 || git switch -f "$orig_branch" >/dev/null 2>&1 || die "could not switch back to $orig_branch"

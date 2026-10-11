@@ -55,6 +55,15 @@ check "drill.sh forced cleanup succeeds" "$?" 0
 grep -q 'return a + b' src/calc.py && ok "drill.sh restores original code" || bad "drill.sh restore mismatch"
 [ -z "$(git branch --list 'tutor/*')" ] && ok "drill.sh deletes scratch branch" || bad "drill.sh left scratch branch"
 
+# ---------- drill.sh --force also discards new files and edits the bug didn't touch ----------
+orig=$(git rev-parse --abbrev-ref HEAD)
+timeout 30 bash "$S/drill.sh" plant --patch "$work/bug.patch" >/dev/null 2>&1
+echo "learner notes" > scratch.txt; echo "learner edit" >> README.md
+timeout 30 bash "$S/drill.sh" cleanup --force >/dev/null 2>&1
+check "drill.sh --force cleanup with new files and other edits" "$?" 0
+[ "$(git rev-parse --abbrev-ref HEAD)" = "$orig" ] && [ -z "$(git status --porcelain)" ] && [ ! -e scratch.txt ] \
+  && ok "drill.sh --force leaves the original branch clean" || bad "drill.sh --force left drill work behind"
+
 # ---------- progress.sh ----------
 d=$(bash "$S/progress.sh" next 3d); rc=$?
 check "progress.sh next" "$rc" 0
@@ -62,6 +71,8 @@ echo "$d" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' && ok "progress.sh next prin
 bash "$S/progress.sh" promote 7d  | grep -q '^21d' && ok "progress.sh promote climbs ladder" || bad "progress.sh promote wrong"
 bash "$S/progress.sh" promote 60d | grep -q '^60d' && ok "progress.sh promote caps at 60d"   || bad "progress.sh cap wrong"
 bash "$S/progress.sh" demote      | grep -q '^1d'  && ok "progress.sh demote returns 1d"     || bad "progress.sh demote wrong"
+bash "$S/progress.sh" promote 5d >/dev/null 2>&1
+check "progress.sh promote refuses an interval off the ladder" "$?" 1
 
 mem="$work/mem"; mkdir -p "$mem"
 printf '# Project plan\ndate: 2026-01-01\n\n## Milestones\n1. CLI skeleton\n' > "$mem/project-plan.md"
