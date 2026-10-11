@@ -16,6 +16,13 @@
       "name": "learning-gate",
       "description": "Enforces learning-guardrails: keeps it opt-in, blocks code edits while a checkpoint is open and pins the open question above the prompt.",
       "source": "./plugins/learning-gate"
+    },
+    {
+      "name": "team-deliberation",
+      "description": "Stress-test an idea or decision with a panel of independent specialist subagents: blind analysis, cross-examination, fact checks and a synthesis that keeps the dissent.",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills/team-deliberation"]
     }
   ]
 }
