@@ -5,6 +5,9 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const CATS = ["data", "concurrency", "security", "performance", "state", "contracts"];
+// What triage and checkpoints can log: the rules' categories, plus architecture, which is
+// judged on the plan (SKILL.md §1) and has no patterns.
+export const LOG_CATS = [...CATS, "architecture"];
 export const STATUSES = ["unfamiliar", "learning", "demonstrated", "needs-reinforcement"];
 export const EVIDENCE = ["predict", "explain", "debug", "experiment", "transfer"];
 export const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;

@@ -1,5 +1,5 @@
 // Tests for the skill's scripts. Each runs the real CLI in a throwaway project with a throwaway HOME.
-// Run: node --test tests/
+// Run: node --test tests/*.test.mjs
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -166,6 +166,19 @@ test("log refuses what the schema doesn't allow", () => {
   assert.match(bad("override", { task: "t1", tier: "gate", reason: "the user really wanted to skip this one" }).err, /"reason" must be/);
   assert.match(bad("nonsense", {}).err, /unknown event/);
   assert.equal(w.exists(".learning/events.jsonl") ? w.read(".learning/events.jsonl").trim() : "", "");
+});
+
+test("architecture is logged and reported, but has no rule patterns", () => {
+  const w = world();
+  const logged = w.run("log.mjs", ["checkpoint", JSON.stringify({ task: "t1", tier: "gate", outcome: "passed", cats: ["architecture"], concepts: ["url-state"], evidence: "explain", help: 0 })]);
+  assert.equal(logged.code, 0, logged.err);
+  assert.equal(w.run("log.mjs", ["diff_review", JSON.stringify({ task: "t1", triaged: "go", actual: "gate", added: ["architecture"] })]).code, 0);
+  assert.match(w.run("analyse.mjs").out, /checkpoints by category: architecture 1/);
+  fs.mkdirSync(path.join(w.home, ".learning"), { recursive: true });
+  fs.writeFileSync(path.join(w.home, ".learning", "rules.json"), JSON.stringify({ version: 2, categories: { architecture: { paths: ["x"] } } }));
+  const bad = w.run("bench.mjs");
+  assert.equal(bad.code, 1);
+  assert.match(bad.err, /unknown category "architecture"/);
 });
 
 // ---- bench ----

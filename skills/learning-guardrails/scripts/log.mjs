@@ -5,7 +5,7 @@
 // Usage: node log.mjs <event> '<json>'      e.g. node log.mjs checkpoint '{"task":"t3","tier":"gate","outcome":"passed"}'
 //        node log.mjs --help                the schema
 import fs from "node:fs";
-import { CATS, SLUG, STATUSES, eventsPath, fail, isMain, now } from "./lib.mjs";
+import { LOG_CATS, SLUG, STATUSES, eventsPath, fail, isMain, now } from "./lib.mjs";
 import { setup } from "./setup.mjs";
 
 const TIERS = ["go", "check", "gate"];
@@ -18,8 +18,8 @@ const FIELDS = {
   triaged: [(v) => TIERS.includes(v), TIERS.join(" | ")],
   actual: [(v) => TIERS.includes(v), TIERS.join(" | ")],
   user_says: [(v) => TIERS.includes(v), TIERS.join(" | ")],
-  cats: [(v) => Array.isArray(v) && v.every((c) => CATS.includes(c)), `a list of ${CATS.join(", ")}`],
-  added: [(v) => Array.isArray(v) && v.every((c) => CATS.includes(c)), `a list of ${CATS.join(", ")}`],
+  cats: [(v) => Array.isArray(v) && v.every((c) => LOG_CATS.includes(c)), `a list of ${LOG_CATS.join(", ")}`],
+  added: [(v) => Array.isArray(v) && v.every((c) => LOG_CATS.includes(c)), `a list of ${LOG_CATS.join(", ")}`],
   concepts: [(v) => Array.isArray(v) && v.every((c) => typeof c === "string" && SLUG.test(c)), "a list of concept names"],
   status_before: [(v) => [...STATUSES, "none"].includes(v), [...STATUSES, "none"].join(" | ")],
   focus: [(v) => ["new", "variation", "implementation", "gap", "reinforcement"].includes(v), "new | variation | implementation | gap | reinforcement"],
