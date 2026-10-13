@@ -8,7 +8,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { CATS, eventsPath, isMain, parseArgs, projectRoot, today } from "./lib.mjs";
+import { LOG_CATS, eventsPath, isMain, parseArgs, projectRoot, today } from "./lib.mjs";
 import { list } from "./record.mjs";
 import { loadRules, parseDiff, signals } from "./rules.mjs";
 
@@ -53,7 +53,7 @@ export function report(events, concepts, { bad = 0, misses = null } = {}) {
     ...skill.filter((e) => e.e === "triage").map((e) => ({ tier: e.tier, cats: e.cats ?? [] })),
     ...mod.filter((e) => e.e === "triage").map((e) => {
       const cat = String(e.what ?? "").split(":")[0].trim();
-      return { tier: e.tier, cats: CATS.includes(cat) ? [cat] : [] };
+      return { tier: e.tier, cats: LOG_CATS.includes(cat) ? [cat] : [] };
     }),
   ];
   const out = [`# Guardrails audit · ${today()}`, ""];

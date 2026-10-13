@@ -17,7 +17,7 @@ One pack per stack, and every pack loads in every project.
 - `files`: which changed files the `diff` patterns read. Leave it out to read every file, as `core` does.
 - `paths`: matched against every changed file, whatever `files` says, so `requirements.txt` can count for Python.
 - `diff` is case-insensitive. `diffExact` is case-sensitive.
-- Categories: `data`, `concurrency`, `security`, `performance`, `state`, `contracts`.
+- Categories: `data`, `concurrency`, `security`, `performance`, `state`, `contracts`. Architecture isn't one: it's judged on the plan (SKILL.md §1), so it has no patterns.
 - `ignore` (in `core`): files that never count, such as prose, lock files and vendored code.
 - Comment lines don't count, unless a layer sets `"go": {"commentOnly": false}`.
 

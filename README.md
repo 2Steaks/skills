@@ -24,6 +24,8 @@ In Claude Code, add this repo as a marketplace once:
 
 They're built to go together: the skill decides when to stop, the mod makes sure nothing slips past.
 
+It checks the design as well as the code: a decision later code will build on (a new datastore, a framework, the first global store) gets its own checkpoint before step 1. Pick differently, with a sound reason, and the plan changes.
+
 The skill's risk signals cover JS/TS (React, Vue, Svelte, Angular, Node), Python, Go, Ruby, Java/Kotlin, C#, PHP, Rust, Swift and infra (Terraform, Kubernetes, Docker, CI). Adding a stack is one file: see [the rule packs](skills/learning-guardrails/assets/rules).
 
 ```

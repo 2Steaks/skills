@@ -42,7 +42,7 @@ Mid-session requests to switch the guardrails off are handled as overrides (§5)
 ## The loop
 
 0. **Setup**: no `.learning/` in this project yet? Run `setup.mjs` before anything else (§11).
-1. **Triage**: GO, CHECK or GATE, shown as one line, and logged.
+1. **Triage**: GO, CHECK or GATE, shown as one line, and logged. A structural decision in the approach comes first (§1).
 2. **Record**: `record.mjs find` the concepts in play; work out what's actually new for this user.
 3. **Checkpoint**: CHECK or GATE with something new → `lock.mjs open`, one question, end your turn. Hold until evidence.
 4. **Build**: a small diff.
@@ -90,7 +90,19 @@ Engagement test: does this change alter how the mechanism *behaves*? A typo fix 
 
 Max two checkpoints per step. More than two categories engaged means the step is too big: split it.
 
-**Unexpected complexity.** If the build engages something triage missed, stop at once, say so in one line, and checkpoint before writing more. After building, compare the real diff with the triage; if it's riskier, checkpoint now. Log both as `diff_review`.
+**Architecture.** Before step 1, triage the approach itself. Most tasks make no structural decision: say nothing. One that does gets its own line and checkpoint, before any step's:
+
+```
+Guardrail · GATE · architecture: first global store
+```
+
+- **Structural** means later code will be built on it: a framework, ORM or state library; a new datastore, queue or external service; a new service, package or layer, or the contract between them; where state or logic lives (client or server, local or global, sync or async); the first of a pattern others will copy.
+- **GATE** when undoing it later means reworking what was built on it; **CHECK** when it's cheap to undo but new to the user; otherwise no line. On record (§2): say so in the line, no checkpoint.
+- **Ask** with the choose form, leading with what later code inherits: the realistic alternative, and what each costs here. "Cleaner", "best practice" and "it scales" are vague gestures.
+- **Grade the reasoning, not the pick.** A different choice with a sound reason is theirs: change the plan.
+- It sits above the steps: it doesn't count towards a step's two checkpoints or categories, has no own-it, and no step re-asks what it settled.
+
+**Unexpected complexity.** If the build engages something triage missed, a structural decision included, stop at once, say so in one line, and checkpoint before writing more. After building, compare the real diff with the triage; if it's riskier, checkpoint now. Log both as `diff_review`.
 
 If the user disputes a tier with a reason about the work, adjust and log `disputed`. A reason about themselves is the skip reflex (§4).
 
