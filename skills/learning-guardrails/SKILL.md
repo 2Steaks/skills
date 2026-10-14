@@ -124,22 +124,23 @@ Before any checkpoint, `record.mjs find` the concepts in play (general and proje
 
 ### Shape
 
-A short lead-in in your message, then the question in the AskUserQuestion tool. A GATE's lead-in starts with its triage line:
+Write the lead-in as text first, in the same reply: a GATE's triage line, the checkpoint line and why it matters. Then the question goes in the AskUserQuestion tool:
 
 ```
 Guardrail · GATE · concurrency: request race
 Checkpoint 1/1 · ~1 min · concurrency
-Why it matters: a double-click starts two runs and the second overwrites the first.
-[≤4 lines of context, or a tiny snippet from THIS change]
-👉 **Your move:** Start is clicked twice within 200ms. How many runs exist after this code?
+Why it matters: people double-click, and each run is paid work.
+👉 **Your move:** Start is clicked twice, 200ms apart, before the first request returns. How many runs exist?
+Where: `src/RunPanel.tsx:14` click → `src/api/startRun.ts:8` POST
 A. One: the second click waits for the first
 B. Two: nothing stops the second request
 C. One: the second replaces the first
 D. Not sure yet
 ```
 
-- In the tool, the `question` is the text after 👉 **Your move:**, without that prefix, and `header` is the label (the category, or the concept for a CHECK; ≤12 characters). Each option is a `label` of ≤5 words with its reason as the `description`, and "Not sure yet" comes last. The question and options go in the tool, not in the message as well.
-- No tool, or it fails? Write it all as above, with the options as `A.`–`D.` lines, and end your turn. A letter is an answer.
+- In the tool, the `question` is the text after 👉 **Your move:**, without that prefix, with the Where line on its own line after it: the dialog shows nothing else. `header` is the label (the category, or the concept for a CHECK; ≤12 characters). Each option is a `label` of ≤5 words with its reason as the `description`, and "Not sure yet" comes last. The question and options go in the tool, not in the message as well.
+- **Where** links the code as `file:line`, so they can jump to it. Give the hops in order (`a.ts:12` → `:30` → `b.ts:40`, the file named once), at most three. A snippet of ≤4 lines goes in the lead-in, only if it helps.
+- No tool, or it fails? The lead-in, then the question and the options as `A.`–`D.` lines, as above, and end your turn. A letter is an answer.
 - Dismissed or left blank isn't an answer: a CHECK is dropped; at a GATE the lock stays and the question waits for their next message.
 
 ### Writing the question
@@ -147,8 +148,10 @@ D. Not sure yet
 - Three real options and "Not sure yet". Vary where the right one sits: never the same letter twice running.
 - Wrong options are misconceptions people actually hold. No trick wording, no trivia, no jokes.
 - Each option makes a claim and gives its reason, so the right pick carries the *why*. One short sentence each, all about the same length: the right one mustn't stand out by being the longest.
-- One concept. Predicting behaviour beats recalling definitions. No jargon the question doesn't need.
-- ≤120 words before the question. Lead with the concrete consequence: what breaks, for whom.
+- Plain and literal, as you'd ask a colleague out loud. Name things directly, as the code does: no metaphors or nicknames ("the orphan row"), no form labels ("Break it:"), no jargon the question doesn't need.
+- The question still makes sense without the lead-in, since the dialog and the pinned band show it alone: what happens, in order, then the one thing to predict, in ≤25 words. Won't fit? It's two questions: ask the one that matters.
+- One concept. Ask what you'd observe (what's saved, sent or shown), not what something is called.
+- ≤120 words before the question. Lead with what's at stake, for whom, without giving the answer away.
 - Real code from this change, one scenario. Not a textbook example; not three.
 - Good forms: predict ("what happens when…"), break it ("what fails if we remove X?"), choose ("A or B here: what do we give up?"), spot ("which line goes wrong on a slow network?", with the lines as options).
 - Re-asking? The question in full, options and all. Never "see above".
