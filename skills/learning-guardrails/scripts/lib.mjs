@@ -40,8 +40,11 @@ export function projectRoot(start = process.cwd()) {
 }
 
 export const learningDir = (root) => path.join(root, ".learning");
-// This Claude Code session, as the CLI tells its shell. Elsewhere "local": one lock per project.
-export const sessionId = () => String(process.env.CLAUDE_CODE_SESSION_ID || "local").replace(/[^\w-]/g, "") || "local";
+// This session: the learning-gate mod's id when it's on (the id it enforces), else the one Claude
+// Code gives its shell. Neither: "local", one lock shared by the whole project.
+export const sessionId = () =>
+  String(process.env.LEARNING_GATE_SESSION || process.env.CLAUDE_CODE_SESSION_ID || "local").replace(/[^\w-]/g, "") || "local";
+export const sessionKnown = () => sessionId() !== "local";
 export const locksDir = (root) => path.join(root, ".learning", "locks");
 export const lockPath = (root, id = sessionId()) => path.join(locksDir(root), `${id}.lock`);
 export const legacyLockPath = (root) => path.join(root, ".learning", "gate.lock");

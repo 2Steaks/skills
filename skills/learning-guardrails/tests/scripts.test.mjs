@@ -18,9 +18,11 @@ function world({ git = true } = {}) {
   fs.mkdirSync(home, { recursive: true });
   fs.mkdirSync(path.join(proj, "src"), { recursive: true });
   if (git) execFileSync("git", ["init", "-q", proj]);
-  // Each run is one Claude Code session; "s1" unless a test says otherwise.
-  const run = (script, args = [], cwd = proj, session = "s1") => {
-    const env = { ...process.env, HOME: home, CLAUDE_CODE_SESSION_ID: session };
+  // Each run is one Claude Code session; "s1" unless a test says otherwise (null: none given).
+  const run = (script, args = [], cwd = proj, session = "s1", extra = {}) => {
+    const env = { ...process.env, HOME: home };
+    for (const name of ["CLAUDE_CODE_SESSION_ID", "LEARNING_GATE_SESSION", "CLAUDECODE"]) delete env[name];
+    Object.assign(env, session === null ? {} : { CLAUDE_CODE_SESSION_ID: session }, extra);
     const r = spawnSync("node", [path.join(SCRIPTS, script), ...args], { cwd, env, encoding: "utf8" });
     return { code: r.status, out: r.stdout.trim(), err: r.stderr.trim() };
   };
@@ -157,6 +159,18 @@ test("list shows other sessions' open checkpoints, newest first; resume and drop
   assert.match(w.run("lock.mjs", ["resume", "nope"], w.proj, "s4").err, /no unfinished checkpoint "nope"/);
   assert.match(w.run("lock.mjs", ["drop", "s1"], w.proj, "s3").out, /^dropped s1: Older task$/);
   assert.equal(w.exists(".learning/locks/s1.lock"), false);
+});
+
+test("the mod's session id wins; with no id at all, every session shares one lock, and says so", () => {
+  const w = world();
+  w.run("lock.mjs", ["open", "GATE", "data", "Which write lands?", "--task", "Save it"], w.proj, "c1", { LEARNING_GATE_SESSION: "m1" });
+  assert.ok(w.exists(".learning/locks/m1.lock"));
+  assert.equal(w.exists(".learning/locks/c1.lock"), false);
+  const bare = w.run("lock.mjs", ["open", "GATE", "state", "Who owns it?", "--task", "Own it"], w.proj, null, { CLAUDECODE: "1" });
+  assert.match(bare.err, /every session in this project shares one lock/);
+  assert.ok(w.exists(".learning/locks/local.lock"));
+  assert.equal(w.run("lock.mjs", ["show"], w.proj, null).out, "GATE · state · Who owns it?");
+  assert.equal(w.run("lock.mjs", ["show"], w.proj, null).err, "");
 });
 
 test("a lock from before sessions were tracked is listed, and resumes into this session", () => {

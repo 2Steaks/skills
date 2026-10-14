@@ -301,5 +301,7 @@ One lock file, two enforcers: the learning-gate mod, or the fallback hook (`refe
 - Shrink or rephrase the question? Open it again: same gate.
 - Close it with `lock.mjs close passed | abandoned | override`, or pause it, at no other time.
 - Checkpoints from other sessions show in `lock.mjs list`. Never close or drop one unasked: resume it when they pick it.
+- Read locks only through `lock.mjs`: `show` is this session's, `list` everyone else's. Never `cat` the folder.
+- `lock.mjs` notes that sessions share one lock? Say so once, in a line: other sessions' checkpoints will look like this one's until the learning-gate mod is on or Claude Code is updated.
 - Edit refused by the gate? The refusal carries the open question: re-ask it, options and all, and wait for the answer.
 - Writes inside `.learning/` always pass, so the record still updates mid-checkpoint. Shell writes (`sed -i`, heredocs) aren't covered: never use them to get round the gate.

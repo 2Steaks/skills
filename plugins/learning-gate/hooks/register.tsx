@@ -55,6 +55,7 @@ const AUDIT = 'Audit the learning guardrails, per section 10 of the learning-gua
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
+    await tellShells($)
     await Promise.all([
       $.command.register({ name: 'learned', description: 'Show what your learning record says you have demonstrated' }),
       $.command.register({ name: 'pickup', description: 'Pick up an unfinished learning checkpoint, from a menu when there are several' }),
@@ -80,6 +81,9 @@ export const register: Register = on => {
     if (tool === 'Skill' && isThisSkill((e as { skill?: unknown }).skill) && !(await read($, namedState))) {
       return { deny: OPT_IN }
     }
+
+    // Every shell, lock.mjs's included, knows which session it runs in: the id this mod enforces.
+    if (tool === 'Bash') await tellShells($)
 
     // A GATE question in the dialog: lock first, so the gate holds while it's open.
     if (tool === 'AskUserQuestion' && (await read($, activeState))) {
@@ -258,6 +262,16 @@ async function sessionId($: Engine): Promise<string> {
 }
 
 const ownLock = async ($: Engine) => `locks/${await sessionId($)}.lock`
+
+// lock.mjs names its lock from LEARNING_GATE_SESSION, so the mod and the skill always agree on whose
+// lock is whose, even where Claude Code gives the shell no session id of its own.
+async function tellShells($: Engine): Promise<void> {
+  try {
+    await $.env.set('LEARNING_GATE_SESSION', await sessionId($))
+  } catch {
+    // lock.mjs falls back to CLAUDE_CODE_SESSION_ID
+  }
+}
 
 // Checkpoints left in this project by other sessions or paused: /pickup's menu.
 async function countUnfinished($: Engine): Promise<number> {

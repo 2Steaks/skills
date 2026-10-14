@@ -14,7 +14,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { fail, isMain, legacyLockPath, lockPath, locksDir, parseArgs, projectRoot, sessionId } from "./lib.mjs";
+import { fail, isMain, legacyLockPath, lockPath, locksDir, parseArgs, projectRoot, sessionKnown } from "./lib.mjs";
 import { setup } from "./setup.mjs";
 
 const REASONS = ["passed", "abandoned", "override"];
@@ -165,6 +165,10 @@ const describe = (c) =>
 if (isMain(import.meta.url)) {
   const { flags, rest } = parseArgs(process.argv.slice(2));
   const [cmd, ...args] = rest;
+  // Inside Claude Code with no session id, every session would take the others' lock for its own.
+  if (!sessionKnown() && process.env.CLAUDECODE) {
+    console.error("note: no session id (no learning-gate mod, and this Claude Code doesn't give one), so every session in this project shares one lock.");
+  }
   if (cmd === "open") {
     const [tier, label, ...words] = args;
     const { existed, line } = open(tier, label, words, flags);

@@ -49,14 +49,17 @@ function check(input) {
   ].join("\n");
 }
 
-// Walks up from each start dir looking for this session's lock.
+// Walks up from each start dir looking for this session's lock, or the shared one lock.mjs
+// writes when it wasn't told the session (an older Claude Code): that one holds every session.
 function findLock(starts, session) {
-  const name = `${String(session || "local").replace(/[^\w-]/g, "") || "local"}.lock`;
+  const names = [...new Set([`${String(session || "local").replace(/[^\w-]/g, "") || "local"}.lock`, "local.lock"])];
   for (const start of starts) {
     if (!start) continue;
     for (let dir = path.resolve(start); ; dir = path.dirname(dir)) {
-      const lock = path.join(dir, ".learning", "locks", name);
-      if (fs.existsSync(lock)) return lock;
+      for (const name of names) {
+        const lock = path.join(dir, ".learning", "locks", name);
+        if (fs.existsSync(lock)) return lock;
+      }
       if (path.dirname(dir) === dir) break;
     }
   }
@@ -104,6 +107,8 @@ function selfTest() {
   fs.writeFileSync(path.join(root, ".learning", "locks", "s1.lock"), "GATE · test · Why?\ntask: test\n");
   results.push(["lock: code edit blocked", edit("src/a.ts")?.includes("Why?") === true]);
   results.push(["lock: another session's edit allowed", edit("src/a.ts", "s2") === null]);
+  fs.renameSync(path.join(root, ".learning", "locks", "s1.lock"), path.join(root, ".learning", "locks", "local.lock"));
+  results.push(["shared lock (no session id): every session blocked", edit("src/a.ts", "s2")?.includes("Why?") === true]);
   results.push(["lock: record edit allowed", edit(".learning/session.md") === null]);
   fs.rmSync(root, { recursive: true, force: true });
   let registered = false;

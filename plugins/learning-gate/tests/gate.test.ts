@@ -158,6 +158,19 @@ describe('the gate', () => {
   })
 })
 
+describe('telling the shells', () => {
+  test("every Bash call runs with this session's id, the one the mod enforces", async ($, on) => {
+    world(on)
+    const sets: { name: string; value?: string }[] = []
+    on('env.set', ($, e) => {
+      sets.push({ name: e.name, value: e.value })
+      return { value: undefined }
+    })
+    await $.tool.call({ tool: 'Bash', command: 'node lock.mjs show' })
+    expect(sets).toEqual([{ name: 'LEARNING_GATE_SESSION', value: SESSION }])
+  })
+})
+
 describe('the mod logs the mechanical events', () => {
   test('gate open, a refused edit and gate close, with time open', async ($, on) => {
     const { files, clock } = world(on, { '/proj/.learning/session.md': '## Now' })
