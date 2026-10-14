@@ -43,7 +43,7 @@ function check(input) {
   return [
     "Learning checkpoint open: code edits are refused until the user shows they understand.",
     `Open question: ${question}`,
-    "If the learning-guardrails skill is loaded, re-ask the question in full and end your turn. If it isn't, tell the user, and that calling /learning-guardrails continues it. Don't load it yourself.",
+    "If the learning-guardrails skill is loaded, re-ask the question, options and all, and wait for the answer. If it isn't, tell the user, and that calling /learning-guardrails continues it. Don't load it yourself.",
     `Close the checkpoint (delete ${lock}) only as that skill allows. Never offer the user a way around it.`,
   ].join("\n");
 }

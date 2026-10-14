@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // lock.mjs: opens and closes the gate. The lock is one line, `TIER · label · question`,
-// read by the learning-gate mod (and the fallback hook) to refuse code edits.
+// read by the learning-gate mod (and the fallback hook) to refuse code edits. Only a GATE locks.
 // Usage:
-//   node lock.mjs open <CHECK|GATE> <label> <question...>   (rewrites an open lock: same gate)
+//   node lock.mjs open GATE <category> <question...>   (rewrites an open lock: same gate)
 //   node lock.mjs close <passed|paused|abandoned|override>
 //   node lock.mjs show
 import fs from "node:fs";
@@ -13,10 +13,11 @@ const REASONS = ["passed", "paused", "abandoned", "override"];
 
 export function open(tierRaw, labelRaw, words, start = process.cwd()) {
   const tier = String(tierRaw ?? "").toUpperCase();
-  if (!["CHECK", "GATE"].includes(tier)) fail("tier must be CHECK or GATE. GO never locks.");
+  if (tier === "CHECK") fail("a CHECK never locks: ask it once the step is built.");
+  if (tier !== "GATE") fail("tier must be GATE. GO never locks.");
   const label = String(labelRaw ?? "").trim();
   if (label === "" || label.length > 40 || label.includes("·")) {
-    fail("label: 1-40 characters, no '·'. The category for a GATE, the concept for a CHECK, or 'own it'.");
+    fail("label: 1-40 characters, no '·'. The GATE's category (concurrency, architecture).");
   }
   const question = words.join(" ").replace(/\s+/g, " ").trim();
   if (question === "") fail("question missing: the question exactly as you ask it.");
@@ -55,6 +56,6 @@ if (isMain(import.meta.url)) {
   } else if (cmd === "show") {
     console.log(show() ?? "none");
   } else {
-    fail("usage: lock.mjs open <CHECK|GATE> <label> <question...> | close <passed|paused|abandoned|override> | show");
+    fail("usage: lock.mjs open GATE <category> <question...> | close <passed|paused|abandoned|override> | show");
   }
 }

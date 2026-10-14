@@ -9,8 +9,9 @@
 // - every prompt carries it to the model, so it survives a compacted context.
 // Edits inside any .learning/ folder always pass, so the record can update.
 // A project's .learning/ is kept out of git via the repo's local exclude list.
-// A reply that ends on a `👉 Your move:` question with no lock open opens one,
-// so a checkpoint Claude forgot to lock still holds. It never overwrites a lock.
+// Only a GATE locks. A GATE question asked with no lock open (a `👉 Your move:`
+// line, or the question dialog headed with the GATE's category) opens one, so a
+// checkpoint Claude forgot to lock still holds. It never overwrites a lock.
 // It logs the mechanical events (triage, gate open/close, refusals) to
 // .learning/events.jsonl as "by":"mod"; the skill logs the judgement calls.
 // A checkpoint left open from an earlier session is parked, not enforced: the band
@@ -77,6 +78,12 @@ export const register: Register = on => {
 
     if (tool === 'Skill' && isThisSkill((e as { skill?: unknown }).skill) && !(await read($, namedState))) {
       return { deny: OPT_IN }
+    }
+
+    // A GATE question in the dialog: lock first, so the gate holds while it's open.
+    if (tool === 'AskUserQuestion' && (await read($, activeState))) {
+      const asked = askedInDialog(e, await read($, triageState))
+      if (asked !== null) await lockIfOpen($, asked)
     }
 
     if (EDIT_TOOLS.has(tool)) {
@@ -304,7 +311,7 @@ const blockMessage = (lock: GateLock) =>
   [
     'Learning checkpoint open: code edits are refused until the user shows they understand.',
     `Open question: ${lock.question}`,
-    'Re-ask the question in full and end your turn.',
+    'Re-ask the question, options and all, and wait for the answer.',
     `Close the checkpoint (delete ${lock.path}) only as the learning-guardrails skill allows. Never offer the user a way around it.`,
   ].join('\n')
 
@@ -322,19 +329,34 @@ type Asked = { tier: string; label: string; question: string }
 
 const MOVE = /👉\s*(?:\*\*)?Your move(?::\*\*|\*\*:|:)\s*(.+)/g
 
-// The last `👉 Your move:` question in a reply, with its tier and label read
-// from the checkpoint header, an Own-it line, or the last triage line.
+// The last triage line's category, when it was a GATE: only a GATE locks.
+function gateCategory(triage: string | null): string | null {
+  const triaged = triage === null ? null : /Guardrail · (GO|CHECK|GATE) · ([^:\n]+)/.exec(triage)
+
+  return triaged?.[1] === 'GATE' ? (triaged[2]?.trim() ?? '') : null
+}
+
+// The last `👉 Your move:` question in a reply after a GATE triage line, labelled
+// from the checkpoint header or that line. A CHECK question never locks.
 export function askedCheckpoint(text: string, triage: string | null): Asked | null {
   const question = [...text.matchAll(MOVE)].at(-1)?.[1]?.replace(/\*\*/g, '').trim()
-  if (!question) return null
-  if (/\bOwn it\b/i.test(text)) return { tier: 'GATE', label: 'own it', question }
+  const category = gateCategory(triage)
+  if (!question || category === null) return null
   const header = text.split('\n').find(line => /^\s*Checkpoint \d+\/\d+ · /.test(line))
   const fromHeader = header?.split(' · ').at(-1)?.trim()
-  const triaged = triage === null ? null : /Guardrail · (GO|CHECK|GATE) · ([^:\n]+)/.exec(triage)
-  const tier = triaged?.[1] === 'GATE' ? 'GATE' : 'CHECK'
-  const label = fromHeader || triaged?.[2]?.trim() || 'checkpoint'
 
-  return { tier, label, question }
+  return { tier: 'GATE', label: fromHeader || category || 'checkpoint', question }
+}
+
+// A GATE question asked in the AskUserQuestion dialog: its header is the category
+// from the last GATE triage line. Any other question (a clarifying one) isn't a checkpoint.
+export function askedInDialog(input: unknown, triage: string | null): Asked | null {
+  const first = (input as { questions?: readonly { question?: unknown; header?: unknown }[] }).questions?.[0]
+  const question = typeof first?.question === 'string' ? first.question.trim() : ''
+  const category = gateCategory(triage)
+  if (question === '' || !category || String(first?.header ?? '').trim().toLowerCase() !== category.toLowerCase()) return null
+
+  return { tier: 'GATE', label: category, question }
 }
 
 async function lockIfOpen($: Engine, asked: Asked): Promise<void> {

@@ -73,17 +73,18 @@ test("lock opens with the exact line, setting up the record first", () => {
   assert.equal(w.run("lock.mjs", ["show"]).out, "GATE · concurrency · Smaller: one or two?");
 });
 
-test("lock refuses GO, a bad label and a missing question", () => {
+test("lock refuses GO, a CHECK, a bad label and a missing question", () => {
   const w = world();
   assert.match(w.run("lock.mjs", ["open", "GO", "x", "Why?"]).err, /GO never locks/);
+  assert.match(w.run("lock.mjs", ["open", "CHECK", "intl", "What does narrow change?"]).err, /a CHECK never locks/);
   assert.match(w.run("lock.mjs", ["open", "GATE", "a · b", "Why?"]).err, /label/);
-  assert.match(w.run("lock.mjs", ["open", "CHECK", "intl"]).err, /question missing/);
+  assert.match(w.run("lock.mjs", ["open", "GATE", "state"]).err, /question missing/);
   assert.equal(w.exists(".learning/gate.lock"), false);
 });
 
 test("closing needs a reason the skill allows; a skip isn't one", () => {
   const w = world();
-  w.run("lock.mjs", ["open", "CHECK", "intl", "What does narrow change?"]);
+  w.run("lock.mjs", ["open", "GATE", "state", "Who owns this state?"]);
   const skip = w.run("lock.mjs", ["close", "skip"]);
   assert.equal(skip.code, 1);
   assert.match(skip.err, /A skip isn't one/);
@@ -165,7 +166,14 @@ test("log refuses what the schema doesn't allow", () => {
   assert.match(bad("checkpoint", { task: "t1", tier: "gate", outcome: "passed", quote: "the user said" }).err, /"quote" isn't part of checkpoint/);
   assert.match(bad("override", { task: "t1", tier: "gate", reason: "the user really wanted to skip this one" }).err, /"reason" must be/);
   assert.match(bad("nonsense", {}).err, /unknown event/);
+  assert.match(bad("checkpoint", { task: "t1", tier: "gate", outcome: "declined" }).err, /only a CHECK can be declined/);
   assert.equal(w.exists(".learning/events.jsonl") ? w.read(".learning/events.jsonl").trim() : "", "");
+});
+
+test("log: a CHECK can be declined, and the audit counts it", () => {
+  const w = world();
+  assert.equal(w.run("log.mjs", ["checkpoint", JSON.stringify({ task: "t1", tier: "check", outcome: "declined", concepts: ["intl"] })]).code, 0);
+  assert.match(w.run("analyse.mjs").out, /checkpoints: 1 · declined 1/);
 });
 
 test("architecture is logged and reported, but has no rule patterns", () => {

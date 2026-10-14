@@ -12,7 +12,7 @@ Optimise for learning, retained understanding, engineering independence and usef
 
 - `scripts/analyse.mjs [--git <days>] [--write]` reads `.learning/events.jsonl` (the skill's events and the mod's, `"by":"mod"`) and the concept record. It reports:
   - triggers per tier and category
-  - outcomes, the override rate, and checkpoints flagged unnecessary
+  - outcomes (declined CHECKs included), the override rate, and checkpoints flagged unnecessary
   - unaided passes, evidence types, repeat teaching, concepts that keep exposing gaps, the skip-reflex trend
   - overhead: turns, checkpoints per task, and the mod's time-open and refused edits
   - `diff_review` mismatches, as missed risk or over-triage
@@ -20,7 +20,7 @@ Optimise for learning, retained understanding, engineering independence and usef
   - with `--git`, commits that carry GATE signals on a day with no gate: possible misses for review
 - `scripts/bench.mjs [--rules <file>] [--cases <file>] [--proposed <file>]` runs the benchmark cases against the triage rules, the record logic and the override policy. `--rules` and `--proposed` put one more file on top of the rules in force: a pack, a layer or an old full copy. With `--proposed` it lists every case that became **more permissive** (risk under-tiered, a needed check dropped) or **more intrusive** (GO over-tiered, a mastered concept retaught), and fails if any case's expectation breaks.
 
-Both are deterministic: no network, randomness or AI. Subjective questions (does this checkpoint force reasoning?) get explicit criteria instead: it needs the why, is tied to the real code, asks one question, is answerable in 1–3 sentences, and can't be passed with a nod. Review against real examples, not another model's opinion alone.
+Both are deterministic: no network, randomness or AI. Subjective questions (does this checkpoint force reasoning?) get explicit criteria instead: its options carry their reasons and its wrong options are real misconceptions, it's tied to the real code, it asks one question, and it can't be passed with a nod. Review against real examples, not another model's opinion alone.
 
 ## Rules and cases
 

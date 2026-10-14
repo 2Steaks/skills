@@ -23,7 +23,7 @@ const FIELDS = {
   concepts: [(v) => Array.isArray(v) && v.every((c) => typeof c === "string" && SLUG.test(c)), "a list of concept names"],
   status_before: [(v) => [...STATUSES, "none"].includes(v), [...STATUSES, "none"].join(" | ")],
   focus: [(v) => ["new", "variation", "implementation", "gap", "reinforcement"].includes(v), "new | variation | implementation | gap | reinforcement"],
-  outcome: [(v) => ["passed", "passed_on_record", "paused", "abandoned", "override"].includes(v), "passed | passed_on_record | paused | abandoned | override"],
+  outcome: [(v) => ["passed", "passed_on_record", "declined", "paused", "abandoned", "override"].includes(v), "passed | passed_on_record | declined | paused | abandoned | override"],
   evidence: [(v) => ["predict", "explain", "debug", "experiment", "transfer", "none"].includes(v), "predict | explain | debug | experiment | transfer | none"],
   help: [count, "ladder rungs used, 0 = unaided"],
   turns: [count, "exchanges from question to close"],
@@ -58,6 +58,7 @@ export function check(e, data) {
     else if (!FIELDS[key][0](value)) problems.push(`"${key}" must be ${FIELDS[key][1]}`);
   }
   if (e === "checkpoint" && data.tier === "go") problems.push("a GO step has no checkpoint");
+  if (e === "checkpoint" && data.outcome === "declined" && data.tier !== "check") problems.push("only a CHECK can be declined: a GATE pauses or holds");
   return problems;
 }
 

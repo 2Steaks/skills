@@ -4,7 +4,7 @@ Skills and mods for Claude Code.
 
 | Name | Kind | What it does |
 | --- | --- | --- |
-| [Learning guardrails](#learning-guardrails) | skill + mod | Holds risky or new code until you show you understand it. |
+| [Learning guardrails](#learning-guardrails) | skill + mod | Quick multiple-choice checks that you understand risky or new code. |
 | [Team deliberation](#team-deliberation) | skill | Puts an idea or decision in front of a panel of independent specialist subagents. |
 | [Build to learn](#build-to-learn) | skill | Learn a new stack by building a project of your own, with Claude as coach. |
 | [Codebase tutor](#codebase-tutor) | skill | Learn an unfamiliar repo in terms of the stack you already know. |
@@ -19,8 +19,8 @@ In Claude Code, add this repo as a marketplace once:
 
 | Name | Kind | What it does |
 | --- | --- | --- |
-| [learning-guardrails](skills/learning-guardrails) | skill | Opt-in: call it with `/learning-guardrails` and it triages every code change, holding risky or new work until you show you understand it. |
-| [learning-gate](plugins/learning-gate) | mod | Enforces learning-guardrails: keeps it opt-in, refuses code edits while a checkpoint is open and pins the open question above the prompt. |
+| [learning-guardrails](skills/learning-guardrails) | skill | Opt-in: call it with `/learning-guardrails` and it triages every code change, asking a quick multiple-choice question about anything risky or new. Only high-risk changes wait for your answer. |
+| [learning-gate](plugins/learning-gate) | mod | Enforces learning-guardrails: keeps it opt-in, refuses code edits while a high-risk checkpoint is open and pins the open question above the prompt. |
 
 They're built to go together: the skill decides when to stop, the mod makes sure nothing slips past.
 
