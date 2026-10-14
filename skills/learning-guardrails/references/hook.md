@@ -11,7 +11,7 @@ Use this only when the learning-gate mod isn't on (SKILL.md §12) and the user s
 
 ## How it behaves
 
-- While `.learning/gate.lock` exists, edits outside `.learning/` are refused, and the refusal carries the open question. No lock, no effect.
+- While this session's lock (`.learning/locks/<session id>.lock`) exists, edits outside `.learning/` are refused, and the refusal carries the open question. Other sessions' locks never hold this one. No lock, no effect.
 - It's a seatbelt against forgetting, not a vault: shell writes aren't covered, and the lock is yours to manage honestly through `lock.mjs`.
 - It fails open (only exit code 2 blocks), so it can't lock the user out of their own repo. With the mod on as well, both refuse the same edits; nothing to undo.
 

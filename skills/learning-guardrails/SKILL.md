@@ -32,8 +32,10 @@ Mid-session requests to switch the guardrails off are handled as overrides (§5)
 | When | Run |
 | --- | --- |
 | first run in a project | `node {skill}/scripts/setup.mjs` |
-| before asking a GATE question | `node {skill}/scripts/lock.mjs open GATE concurrency "Two clicks within 200ms: how many runs?"` |
-| when a GATE closes | `node {skill}/scripts/lock.mjs close passed` (or `paused`, `abandoned`, `override`) |
+| before asking a GATE question | `node {skill}/scripts/lock.mjs open GATE concurrency "Two clicks within 200ms: how many runs?" --task "Stop double runs"` |
+| when a GATE closes | `node {skill}/scripts/lock.mjs close passed` (or `abandoned`, `override`) |
+| pausing a GATE | `node {skill}/scripts/lock.mjs pause --step "<where you'd got to>"` |
+| unfinished checkpoints | `node {skill}/scripts/lock.mjs list` · `resume <id>` · `drop <id>` |
 | checking the record | `node {skill}/scripts/record.mjs find retries` · `record.mjs show <concept>` |
 | updating the record | `node {skill}/scripts/record.mjs update <concept> --evidence "predict: <note>" --status learning` |
 | logging | `node {skill}/scripts/log.mjs checkpoint '<json>'` (`log.mjs --help` for the schema) |
@@ -206,7 +208,9 @@ No lectures about imposter syndrome. Count it in the checkpoint's `skip_reflex`.
 ## 5. Not now, pause, override
 
 - **Not now** on a CHECK: dropped. Log it `declined`; nothing is owed.
-- **Pause**: always allowed. Note where you were in `.learning/session.md` (task, step, open question), then `lock.mjs close paused`. Gated code stays unwritten. On "resume" or `/pickup`: a 3-line recap, then the open question in full, with the lock reopened.
+- **Pause**: always allowed. `lock.mjs pause --step "<where you'd got to>"` keeps the checkpoint, unenforced, for later. Gated code stays unwritten.
+- **Resume**: on "resume" or `/pickup`, `lock.mjs list`. None: say so. One: resume it. Several: ask which in the question tool, newest first, each option its task, with when and the question as its description (the four newest; name any others in your message, to type). Then `lock.mjs resume <id>`, a 3-line recap (the task, where they'd got to, the question) and the question in full.
+- **Drop one**: only when they ask. `lock.mjs drop <id>`.
 - **Skipping a GATE**: doesn't exist. "Not sure yet" is the way through. `lock.mjs` won't close for a skip either.
 - **Dropped task**: the task behind an open checkpoint is abandoned → `lock.mjs close abandoned`. No gated code gets written, so it isn't a skip.
 - **Live incident**: the user says prod is down or it's an emergency → no checkpoints; stabilise first. Note the one concept worth a look in `session.md`, offer it once when it's over, then let it go.
@@ -239,7 +243,7 @@ Register only. Write your own; never use these as written:
 - Tangents: ignore them, or one line under `Parked` in `session.md`, never shown unless asked. Unless the tangent *is* the gap.
 - After any interruption, re-anchor in one line (`Back to: why the second request wins.`), then the question in full.
 - Wins: one specific line, logged. No tallies, streaks or scores.
-- Session start: if `lock.mjs show` finds a lock or `session.md` holds a paused checkpoint, open with a 3-line "where you were".
+- Session start: `lock.mjs show` finds this session's lock → a 3-line "where you were", then its question. Others unfinished (`lock.mjs list`): the mod's band counts them; without it, one line. Never resume one unasked.
 
 ## 8. The record
 
@@ -288,14 +292,14 @@ One lock file, two enforcers: the learning-gate mod, or the fallback hook (`refe
 - Don't narrate what it shows (the pinned question, toasts, status line).
 - A prompt carrying its "Learning checkpoint open" note is the user replying while your question is open: judge it as the answer unless it plainly isn't one.
 - Forget a lock and the mod opens one when you ask a GATE question (the 👉 line, or the question tool with the category as its header), so the gate still holds. Open it yourself anyway: your wording reads better pinned.
-- Its commands land on you: `/pickup` asks for the recap and the open question (§5); `/audit` asks you to run §10; `/learned` reads the record itself.
+- Its commands land on you: `/pickup` asks you to bring up the unfinished checkpoints (§5); `/audit` asks you to run §10; `/learned` reads the record itself.
 
 **The lock**
 
-- Open it with `lock.mjs open GATE <category> "<question>"` right before asking a GATE question. CHECK and GO never lock.
+- Open it with `lock.mjs open GATE <category> "<question>" --task "<what you're building>"` right before asking a GATE question. CHECK and GO never lock. Each session has its own lock: another session's never holds this one.
   - question: what you're asking, made to stand on its own (it's pinned above the prompt, away from your message), under ~200 characters. The options stay out of it.
 - Shrink or rephrase the question? Open it again: same gate.
-- Close it with `lock.mjs close passed | paused | abandoned | override`, at no other time.
-- A lock you didn't open this session is a checkpoint left from last time: open with the where-you-were recap and re-ask it. Don't close it.
+- Close it with `lock.mjs close passed | abandoned | override`, or pause it, at no other time.
+- Checkpoints from other sessions show in `lock.mjs list`. Never close or drop one unasked: resume it when they pick it.
 - Edit refused by the gate? The refusal carries the open question: re-ask it, options and all, and wait for the answer.
 - Writes inside `.learning/` always pass, so the record still updates mid-checkpoint. Shell writes (`sed -i`, heredocs) aren't covered: never use them to get round the gate.

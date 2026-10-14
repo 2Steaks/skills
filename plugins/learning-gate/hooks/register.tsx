@@ -1,9 +1,11 @@
 // learning-gate: the enforcement half of the learning-guardrails skill.
 // The skill is opt-in: Claude may load it only when the user's latest message runs
 // /learning-guardrails or names it (/pickup and /audit do); any other attempt is refused.
-// The skill writes .learning/gate.lock (one line: `TIER · category · question`)
-// right before it asks a checkpoint question, and deletes it when the user
-// passes, pauses, drops the task, or gives a valid override. While it exists:
+// The skill writes .learning/locks/<session id>.lock (first line: `TIER · category ·
+// question`) right before it asks a GATE question, and deletes it when the user passes,
+// drops the task, or gives a valid override; a pause keeps it under another name for
+// /pickup. Each session is held only by its own lock, so sessions never block each
+// other; the band counts the others. While this session's lock exists:
 // - code edits are refused, with the open question as the reason;
 // - the question is pinned above the prompt;
 // - every prompt carries it to the model, so it survives a compacted context.
@@ -14,8 +16,8 @@
 // checkpoint Claude forgot to lock still holds. It never overwrites a lock.
 // It logs the mechanical events (triage, gate open/close, refusals) to
 // .learning/events.jsonl as "by":"mod"; the skill logs the judgement calls.
-// A checkpoint left open from an earlier session is parked, not enforced: the band
-// says so and /pickup resumes it (loading the skill). Nothing blocks until then.
+// Until the skill is in play this session, its lock is parked, not enforced: the band
+// says so and /pickup resumes it (loading the skill), or picks another from a menu.
 // A hook that fails is skipped: the gate fails open, never locking you out.
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
@@ -28,8 +30,7 @@ const lockState = atom({ plugin: 'learning-gate', key: 'lock' } as const, null)
 const triageState = atom({ plugin: 'learning-gate', key: 'triage' } as const, null)
 const activeState = atom({ plugin: 'learning-gate', key: 'active' } as const, false)
 const namedState = atom({ plugin: 'learning-gate', key: 'named' } as const, false)
-
-const LOCK = '.learning/gate.lock'
+const unfinishedState = atom({ plugin: 'learning-gate', key: 'unfinished' } as const, 0)
 const EDIT_TOOLS = new Set(['Edit', 'MultiEdit', 'Write', 'NotebookEdit'])
 const TRIAGE = /Guardrail · (GO|CHECK|GATE) · ([^\n`]+)/g
 const SKILL = 'learning-guardrails'
@@ -43,20 +44,20 @@ const RULES = {
   text: [
     'The learning-gate plugin is installed. It enforces the checkpoints the learning-guardrails skill opens, and nothing else.',
     'The learning-guardrails skill is opt-in: load it only when the user runs /learning-guardrails or names it in their latest message. Never load it on your own, even for coding tasks.',
-    `While ${LOCK} exists in the project, the plugin refuses code edits and pins the open question above the prompt. Close a checkpoint (delete the lock) only as the skill allows, and never offer the user a way around one.`,
+    "While this session's lock (.learning/locks/<session id>.lock) exists, the plugin refuses code edits and pins the open question above the prompt. Other sessions' locks never hold this one. Close a checkpoint only as the skill allows, and never offer the user a way around one.",
     "The plugin replaces the skill's hook script: do not install learning-gate.mjs.",
   ].join('\n'),
 } as const
 
 const PICKUP =
-  'Pick up where we left off, per the learning-guardrails skill: a three-line recap from .learning/session.md, then any open question in full.'
+  'Pick up an unfinished learning checkpoint, per the learning-guardrails skill: list them, ask me which if there is more than one, then a three-line recap and the question in full.'
 const AUDIT = 'Audit the learning guardrails, per section 10 of the learning-guardrails skill.'
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await Promise.all([
       $.command.register({ name: 'learned', description: 'Show what your learning record says you have demonstrated' }),
-      $.command.register({ name: 'pickup', description: 'Pick up the open learning checkpoint where you left off' }),
+      $.command.register({ name: 'pickup', description: 'Pick up an unfinished learning checkpoint, from a menu when there are several' }),
       $.command.register({ name: 'audit', description: 'Audit the learning guardrails against their own logs' }),
     ])
     await refresh($)
@@ -125,7 +126,7 @@ export const register: Register = on => {
     const note =
       `Learning checkpoint open (${label(lock)}): "${lock.question}" ` +
       'Read this message as the answer unless it plainly is not one (a pickup request is not: re-ask the question in full), and judge it by the learning-guardrails evidence bar. ' +
-      `Code edits stay refused until the checkpoint closes: delete ${lock.path} only as the learning-guardrails skill allows.`
+      `Code edits stay refused until the checkpoint closes, only as the learning-guardrails skill allows (lock.mjs).`
 
     return next({ ...e, context: [...(e.context ?? []), note] })
   }).catch(($, e, next) => next(e))
@@ -160,8 +161,19 @@ export const register: Register = on => {
   // The band above the prompt: the open question, pinned until answered.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const lock = await read($, lockState)
-    if (lock === null || e.props.hasSurvey) return next(e)
+    if (e.props.hasSurvey) return next(e)
     const { Box, Text } = $.ui.resolve(e)
+
+    if (lock === null) {
+      const others = await read($, unfinishedState)
+      if (others === 0) return next(e)
+
+      return (
+        <Text dimColor wrap="wrap">
+          ⏸ {others} unfinished checkpoint{others === 1 ? '' : 's'} · /pickup to carry on
+        </Text>
+      )
+    }
 
     if (!(await read($, activeState))) {
       return (
@@ -229,12 +241,43 @@ async function refresh($: Engine): Promise<GateLock | null> {
   const lock = await readLock($, [await $.session.cwd()])
   await setLock($, lock)
   if (lock !== null) await keepPrivate($, lock.path)
+  const others = await countUnfinished($)
+  if ((await read($, unfinishedState)) !== others) await update($, unfinishedState, () => others)
 
   return lock
 }
 
+// This session, as the engine names it: the same id the CLI gives the shell, so
+// lock.mjs and the mod agree on whose lock is whose.
+async function sessionId($: Engine): Promise<string> {
+  try {
+    return String(await $.session.id()).replace(/[^\w-]/g, '') || 'local'
+  } catch {
+    return 'local'
+  }
+}
+
+const ownLock = async ($: Engine) => `locks/${await sessionId($)}.lock`
+
+// Checkpoints left in this project by other sessions or paused: /pickup's menu.
+async function countUnfinished($: Engine): Promise<number> {
+  try {
+    const root = await projectRecord($)
+    if (root === null) return 0
+    const own = (await ownLock($)).slice('locks/'.length)
+    const dir = join(root, 'locks')
+    const locks = (await $.fs.exists(dir))
+      ? (await $.fs.list(dir)).filter(f => f.kind === 'file' && f.name.endsWith('.lock') && f.name !== own).length
+      : 0
+
+    return locks + ((await $.fs.exists(join(root, 'gate.lock'))) ? 1 : 0)
+  } catch {
+    return 0
+  }
+}
+
 async function readLock($: Engine, starts: readonly string[]): Promise<GateLock | null> {
-  const path = await findUp($, starts, LOCK)
+  const path = await findUp($, starts, `.learning/${await ownLock($)}`)
   if (path === null) return null
   try {
     return parseLock(path, await $.fs.read(path))
@@ -264,7 +307,7 @@ async function trackGate($: Engine, lock: GateLock | null): Promise<void> {
     // A record deleted outright takes its open gate with it (nowhere left to log).
     let pruned = false
     for (const stored of Object.keys(gates)) {
-      if (!(await $.fs.exists(parentOf(stored)))) {
+      if (!(await $.fs.exists(recordOf(stored)))) {
         delete gates[stored]
         pruned = true
       }
@@ -272,7 +315,7 @@ async function trackGate($: Engine, lock: GateLock | null): Promise<void> {
     if (pruned) await $.store.set(GATES, gates)
     const root = await projectRecord($)
     if (root === null) return
-    const path = join(root, 'gate.lock')
+    const path = join(root, await ownLock($))
     const open = gates[path]
     if (lock !== null && lock.path === path && open === undefined) {
       const at = await $.clock.now()
@@ -295,14 +338,16 @@ function showStatus($: Engine, lock: GateLock | null, triage: string | null, act
   else $.ui.status(triage ?? undefined)
 }
 
+// The first line is the checkpoint; any `key: value` lines after it are lock.mjs's own.
 export function parseLock(path: string, text: string): GateLock {
-  const line = text.trim().replace(/\s*\n\s*/g, ' ')
-  const [tier, category, ...rest] = line.split(' · ')
+  const first = text.trim().split('\n')[0]?.trim() ?? ''
+  const [tier, category, ...rest] = first.split(' · ')
   if (tier !== undefined && category !== undefined && rest.length > 0 && /^(GO|CHECK|GATE)$/i.test(tier.trim())) {
     return { path, tier: tier.trim().toUpperCase(), category: category.trim(), question: rest.join(' · ').trim() }
   }
+  const line = text.trim().replace(/\s*\n\s*/g, ' ')
 
-  return { path, tier: 'CHECKPOINT', category: '', question: line || 'See .learning/session.md' }
+  return { path, tier: 'CHECKPOINT', category: '', question: line || 'See lock.mjs show' }
 }
 
 const label = (lock: GateLock) => [lock.tier, lock.category].filter(Boolean).join(' · ')
@@ -312,7 +357,7 @@ const blockMessage = (lock: GateLock) =>
     'Learning checkpoint open: code edits are refused until the user shows they understand.',
     `Open question: ${lock.question}`,
     'Re-ask the question, options and all, and wait for the answer.',
-    `Close the checkpoint (delete ${lock.path}) only as the learning-guardrails skill allows. Never offer the user a way around it.`,
+    'Close the checkpoint only as the learning-guardrails skill allows (lock.mjs). Never offer the user a way around it.',
   ].join('\n')
 
 function editTarget(e: unknown): string | undefined {
@@ -364,7 +409,7 @@ async function lockIfOpen($: Engine, asked: Asked): Promise<void> {
     const cwd = await $.session.cwd()
     if ((await readLock($, [cwd])) !== null) return // Claude's own lock stands
     const root = (await projectRecord($)) ?? join(cwd, '.learning')
-    await $.fs.write(join(root, 'gate.lock'), `${asked.tier} · ${asked.label} · ${asked.question}\n`)
+    await $.fs.write(join(root, await ownLock($)), `${asked.tier} · ${asked.label} · ${asked.question}\n`)
     await refresh($)
   } catch {
     // the skill still holds the line if this fails
@@ -515,6 +560,14 @@ function ancestors(dir: string): string[] {
 }
 
 const parentOf = (file: string) => ancestors(file)[1] ?? '/'
+
+// The .learning folder a lock belongs to: the record, which outlives its locks folder.
+function recordOf(lock: string): string {
+  const parts = clean(lock).split('/')
+  const at = parts.lastIndexOf('.learning')
+
+  return at < 1 ? parentOf(lock) : parts.slice(0, at + 1).join('/')
+}
 
 const join = (dir: string, rest: string) => `${dir === '/' ? '' : dir}/${rest}`
 
