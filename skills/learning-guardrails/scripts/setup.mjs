@@ -10,7 +10,6 @@ const SESSION = `## Now
 - Task: none
 - Open checkpoint: none
 ## Parked
-## IOUs
 ## Setup
 - Gate: unknown            # mod | hook | declined
 `;

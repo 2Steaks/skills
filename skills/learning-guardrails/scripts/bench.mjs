@@ -43,19 +43,19 @@ export function decide(c, tier) {
   if (r.status === "demonstrated") {
     if (r.sameContext === false) return { checkpoint: true, focus: "implementation" };
     if (c.variation) return { checkpoint: true, focus: "variation" };
-    if ((r.daysSince ?? 0) >= 90) return { checkpoint: true, focus: "reinforcement" };
-    return { checkpoint: false, focus: "on-record" };
+    return { checkpoint: false, focus: "on-record" }; // however long ago: no scheduled re-checks
   }
-  if (r.status === "needs-reinforcement") return { checkpoint: true, focus: "reinforcement" };
+  if (r.status === "learning" || r.status === "needs-reinforcement") return { checkpoint: true, focus: "reinforcement" };
   return { checkpoint: true, focus: "new" };
 }
 
-// SKILL.md §5: the reason must be about the work; a GATE takes only an incident or throwaway code.
+// SKILL.md §5: a CHECK can always wait ("not now" drops it). A GATE takes only an incident
+// or throwaway code, and a reason about the user is the skip reflex.
 export function overrideAccepted(tier, reason) {
+  if (String(tier).toLowerCase() !== "gate") return true;
   const r = String(reason).toLowerCase();
   if (/\b(later|slow|no time|doesn'?t matter|whatever|don'?t care|i'?m|probably fine|skip)\b/.test(r)) return false;
-  if (String(tier).toLowerCase() === "gate") return /\b(prod|production|incident|outage|down|hotfix|throwaway|spike|prototype|deleting)\b/.test(r);
-  return r.trim().length > 0;
+  return /\b(prod|production|incident|outage|down|hotfix|throwaway|spike|prototype|deleting)\b/.test(r);
 }
 
 export function evaluate(c, rules) {

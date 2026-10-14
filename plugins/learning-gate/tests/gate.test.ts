@@ -1,7 +1,7 @@
 import type { On } from 'claude-code'
 import { describe, expect, mock, test, type TestBody } from 'claude-code/testing'
 
-import { askedCheckpoint, clean, isInRecord, parseConcept, parseLock, summarise } from '../hooks/register'
+import { askedCheckpoint, askedInDialog, clean, isInRecord, parseConcept, parseLock, summarise } from '../hooks/register'
 
 const CWD = '/proj'
 const LOCK = '/proj/.learning/gate.lock'
@@ -85,6 +85,11 @@ const append = async ($: Parameters<TestBody>[0], row: never) => {
 }
 
 const edit = (file_path: string) => ({ tool: 'Edit' as const, file_path, old_string: 'a', new_string: 'b' })
+const ask = (header: string, question: string) =>
+  ({
+    tool: 'AskUserQuestion',
+    questions: [{ question, header, multiSelect: false, options: [{ label: 'One' }, { label: 'Two' }, { label: 'Not sure yet' }] }],
+  }) as never
 const refusal = (ran: { deny?: string; text?: string }) => ran.deny ?? ''
 const prompt = (text: string) => ({ text, wait: false, origin: { kind: 'composer' as const } })
 const command = (name: string) => ({
@@ -230,11 +235,29 @@ describe('a question asked without a lock', () => {
     expect(refusal(await $.tool.call(edit('/proj/src/a.ts')))).toContain('One run or two')
   })
 
-  test('an Own-it question opens an own-it lock', async ($, on) => {
+  test('a CHECK question never locks', async ($, on) => {
     const { files } = world(on, { '/proj/.learning/session.md': '## Now' })
     await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
-    await append($, reply('Built it.\n\nOwn it · 1 question\n👉 **Your move:** The panel unmounts mid-fetch. What happens?', 'r3'))
-    expect(files.get(LOCK)).toBe('GATE · own it · The panel unmounts mid-fetch. What happens?\n')
+    await append($, reply('Guardrail · CHECK · new to you: Intl.DurationFormat', 'r3'))
+    await append($, reply('Built it.\n\n👉 **Your move:** What does style narrow change?\nA. Units\nB. Rounding\nC. Locale\nD. Not sure yet', 'r3b'))
+    expect(files.has(LOCK)).toBe(false)
+  })
+
+  test('a GATE question in the dialog opens a lock, and edits are refused', async ($, on) => {
+    const { files } = world(on, { '/proj/.learning/session.md': '## Now' })
+    await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
+    await append($, reply('Guardrail · GATE · concurrency: retry on a POST', 'r6'))
+    await $.tool.call(ask('concurrency', 'Two clicks within 200ms: how many runs?'))
+    expect(files.get(LOCK)).toBe('GATE · concurrency · Two clicks within 200ms: how many runs?\n')
+    expect(refusal(await $.tool.call(edit('/proj/src/a.ts')))).toContain('Two clicks')
+  })
+
+  test('a clarifying question in the dialog opens nothing', async ($, on) => {
+    const { files } = world(on, { '/proj/.learning/session.md': '## Now' })
+    await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
+    await append($, reply('Guardrail · GATE · concurrency: retry on a POST', 'r7'))
+    await $.tool.call(ask('Approach', 'Retry in the client or the server?'))
+    expect(files.has(LOCK)).toBe(false)
   })
 
   test("Claude's own lock is never overwritten", async ($, on) => {
@@ -250,9 +273,14 @@ describe('a question asked without a lock', () => {
   })
 
   test('parsing the question, tier and label', () => {
-    expect(askedCheckpoint('👉 **Your move:** Why?', 'Guardrail · CHECK · new to you: Intl')).toEqual({ tier: 'CHECK', label: 'new to you', question: 'Why?' })
-    expect(askedCheckpoint('👉 Your move: Why?', null)).toEqual({ tier: 'CHECK', label: 'checkpoint', question: 'Why?' })
-    expect(askedCheckpoint('No question here.', null)).toBeNull()
+    expect(askedCheckpoint('👉 **Your move:** Why?', 'Guardrail · GATE · data: a migration')).toEqual({ tier: 'GATE', label: 'data', question: 'Why?' })
+    expect(askedCheckpoint('👉 **Your move:** Why?', 'Guardrail · CHECK · new to you: Intl')).toBeNull()
+    expect(askedCheckpoint('👉 Your move: Why?', null)).toBeNull()
+    expect(askedCheckpoint('No question here.', 'Guardrail · GATE · data: a migration')).toBeNull()
+    const dialog = (header: string) => ({ questions: [{ question: 'One run or two?', header }] })
+    expect(askedInDialog(dialog('Concurrency'), 'Guardrail · GATE · concurrency: retry')).toEqual({ tier: 'GATE', label: 'concurrency', question: 'One run or two?' })
+    expect(askedInDialog(dialog('intl'), 'Guardrail · CHECK · new to you: Intl')).toBeNull()
+    expect(askedInDialog({}, 'Guardrail · GATE · concurrency: retry')).toBeNull()
   })
 })
 
@@ -319,7 +347,7 @@ describe('opt-in', () => {
     expect(ran[0]?.args).toContain('Pick up where we left off')
     expect((await $.tool.call({ tool: 'Skill', skill: 'learning-guardrails' } as never)).deny).toBeUndefined()
     const after = refusal(await $.tool.call(edit('/proj/src/a.ts')))
-    expect(after).toContain('Re-ask the question in full')
+    expect(after).toContain('Re-ask the question, options and all')
     expect(after).toContain(QUESTION)
   })
 

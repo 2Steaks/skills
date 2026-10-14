@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "learning-guardrails",
-      "description": "Opt-in learning guardrails: call /learning-guardrails and it holds risky or new code until you show you understand it.",
+      "description": "Opt-in learning guardrails: call /learning-guardrails and it checks you understand risky or new code with quick multiple-choice questions; only high-risk changes wait for your answer.",
       "source": "./",
       "strict": false,
       "skills": ["./skills/learning-guardrails"]
