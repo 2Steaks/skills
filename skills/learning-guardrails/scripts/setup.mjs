@@ -4,12 +4,9 @@
 // Usage: node setup.mjs [--gate mod|hook|declined]
 import fs from "node:fs";
 import path from "node:path";
-import { excludeFile, fail, generalDir, home, isMain, learningDir, parseArgs, projectDir, projectRoot } from "./lib.mjs";
+import { excludeFile, fail, generalDir, home, isMain, learningDir, locksDir, parseArgs, projectDir, projectRoot } from "./lib.mjs";
 
-const SESSION = `## Now
-- Task: none
-- Open checkpoint: none
-## Parked
+const SESSION = `## Parked
 ## Setup
 - Gate: unknown            # mod | hook | declined
 `;
@@ -18,7 +15,7 @@ export function setup(start = process.cwd()) {
   const root = projectRoot(start);
   const dir = learningDir(root);
   const created = [];
-  for (const d of [dir, projectDir(root), generalDir()]) {
+  for (const d of [dir, projectDir(root), locksDir(root), generalDir()]) {
     if (!fs.existsSync(d)) {
       fs.mkdirSync(d, { recursive: true });
       created.push(d);

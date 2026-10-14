@@ -1,4 +1,4 @@
-/** The open checkpoint, as read from `.learning/gate.lock`. */
+/** This session's open checkpoint, as read from `.learning/locks/<session id>.lock`. */
 export type GateLock = {
   /** Absolute path of the lock file. */
   path: string
@@ -21,6 +21,8 @@ declare module 'claude-code' {
       active: boolean
       /** Whether the user's latest prompt named the skill (lets Claude load it). */
       named: boolean
+      /** Checkpoints left in the project by other sessions, or paused: /pickup's menu. */
+      unfinished: number
     }
   }
 }

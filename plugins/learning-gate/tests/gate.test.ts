@@ -4,7 +4,8 @@ import { describe, expect, mock, test, type TestBody } from 'claude-code/testing
 import { askedCheckpoint, askedInDialog, clean, isInRecord, parseConcept, parseLock, summarise } from '../hooks/register'
 
 const CWD = '/proj'
-const LOCK = '/proj/.learning/gate.lock'
+const SESSION = 'sess-1'
+const LOCK = `/proj/.learning/locks/${SESSION}.lock`
 const QUESTION = 'If Start is clicked twice within 200ms, how many runs exist, and why?'
 const LOCK_LINE = `GATE · concurrency · ${QUESTION}\n`
 const SURFACES = ['terminal', 'desktop'] as const
@@ -34,6 +35,7 @@ function world(on: On, entries: Record<string, string> = {}, stored: Record<stri
   const clock = mock.clock(on, { now: Date.UTC(2026, 9, 9, 9, 0, 0) })
   mock.store(on, stored)
   on('session.cwd', () => ({ value: CWD }))
+  on('session.id', () => ({ value: SESSION }))
   on('fs.exists', ($, e) => ({ value: files.has(e.path) || [...files.keys()].some(p => p.startsWith(`${e.path}/`)) }))
   on('fs.read', ($, e) => {
     const text = files.get(e.path)
@@ -61,7 +63,7 @@ function world(on: On, entries: Record<string, string> = {}, stored: Record<stri
   // The engine's own band: nothing of its own to show.
   on('ui.render', ($, e) => $.ui.resolve(e).Box({ key: 'engine' }))
   on('tool.call', ($, e) => {
-    if (e.tool === 'Bash' && e.command.includes('rm -f .learning/gate.lock')) files.delete(LOCK)
+    if (e.tool === 'Bash' && e.command.includes('lock.mjs close')) files.delete(LOCK)
     if (e.tool === 'Write') files.set(e.file_path, e.content)
     return { result: 'ran' } as never
   })
@@ -149,7 +151,7 @@ describe('the gate', () => {
     await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
     expect(refusal(await $.tool.call(edit('/proj/src/a.ts')))).toContain(QUESTION)
     expect(statuses.at(-1)).toContain('Checkpoint open')
-    await $.tool.call({ tool: 'Bash', command: 'rm -f .learning/gate.lock' })
+    await $.tool.call({ tool: 'Bash', command: 'node lock.mjs close passed' })
     expect(toasts).toContain('Gate lifted. Carry on.')
     expect(statuses.at(-1)).toBeUndefined()
     expect((await $.tool.call(edit('/proj/src/a.ts'))).deny).toBeUndefined()
@@ -166,7 +168,7 @@ describe('the mod logs the mechanical events', () => {
     // the question shrinks: the band follows, but it's the same gate
     await $.tool.call({ tool: 'Write', file_path: LOCK, content: 'GATE · concurrency · One run or two, and why?' })
     await clock.advance(60_000)
-    await $.tool.call({ tool: 'Bash', command: 'rm -f .learning/gate.lock' })
+    await $.tool.call({ tool: 'Bash', command: 'node lock.mjs close passed' })
     const log = events(files)
     expect(log.map(e => e.e)).toEqual(['gate_open', 'edit_refused', 'gate_close'])
     expect(log.every(e => e.by === 'mod')).toBe(true)
@@ -333,6 +335,40 @@ describe('opt-in', () => {
     }
   })
 
+  test("another session's lock never holds this one, and the band counts it for /pickup", async ($, on) => {
+    world(on, { '/proj/.learning/locks/sess-0.lock': `${LOCK_LINE}task: Make claimSlot safe\n` })
+    let context: readonly string[] | undefined
+    on('prompt.submit', ($, e) => {
+      context = e.context
+      return { text: e.text }
+    })
+    await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
+    await $.prompt.submit(prompt('add a timeout'))
+    expect(context).toBeUndefined()
+    expect((await $.tool.call(edit('/proj/src/a.ts'))).deny).toBeUndefined()
+    for (const surface of SURFACES) {
+      const ui = await $.ui.mount({ ...BAND, surface })
+      expect((await ui.find({ type: 'Text', text: 'unfinished' }))?.text).toBe('⏸ 1 unfinished checkpoint · /pickup to carry on')
+      await ui.unmount()
+    }
+  })
+
+  test('paused checkpoints and a lock from before sessions were tracked count too', async ($, on) => {
+    world(on, {
+      '/proj/.learning/locks/paused-abc.lock': `${LOCK_LINE}paused: 2026-10-08T09:00:00.000Z\n`,
+      '/proj/.learning/gate.lock': LOCK_LINE,
+      [LOCK]: LOCK_LINE,
+    })
+    on('prompt.submit', ($, e) => ({ text: e.text }))
+    await $.prompt.submit(prompt('hello'))
+    await $.tool.call({ tool: 'Bash', command: 'node lock.mjs close passed' })
+    for (const surface of SURFACES) {
+      const ui = await $.ui.mount({ ...BAND, surface })
+      expect((await ui.find({ type: 'Text', text: 'unfinished' }))?.text).toBe('⏸ 2 unfinished checkpoints · /pickup to carry on')
+      await ui.unmount()
+    }
+  })
+
   test('/pickup loads the skill with the pickup ask, and the gate holds again', async ($, on) => {
     world(on, { [LOCK]: LOCK_LINE })
     const ran: { command: string; args?: string }[] = []
@@ -344,7 +380,7 @@ describe('opt-in', () => {
     await $.command.run(command('pickup'))
     await new Promise(r => setTimeout(r, 0))
     expect(ran).toHaveLength(1)
-    expect(ran[0]?.args).toContain('Pick up where we left off')
+    expect(ran[0]?.args).toContain('Pick up an unfinished learning checkpoint')
     expect((await $.tool.call({ tool: 'Skill', skill: 'learning-guardrails' } as never)).deny).toBeUndefined()
     const after = refusal(await $.tool.call(edit('/proj/src/a.ts')))
     expect(after).toContain('Re-ask the question, options and all')
@@ -361,7 +397,7 @@ describe('opt-in', () => {
     })
     await $.command.run(command('pickup'))
     await new Promise(r => setTimeout(r, 0))
-    expect(asked.at(-1)).toContain('Pick up where we left off')
+    expect(asked.at(-1)).toContain('Pick up an unfinished learning checkpoint')
   })
 
   test('the standing rule says opt-in', async ($, on) => {
@@ -487,6 +523,10 @@ describe('/learned', () => {
 describe('parsing', () => {
   test('a lock line splits into tier, category and question', () => {
     expect(parseLock(LOCK, LOCK_LINE)).toEqual({ path: LOCK, tier: 'GATE', category: 'concurrency', question: QUESTION })
+  })
+
+  test("lock.mjs's fields after the first line stay out of the question", () => {
+    expect(parseLock(LOCK, `${LOCK_LINE}task: Make claimSlot safe\nopened: 2026-10-09T09:00:00.000Z\n`)).toEqual({ path: LOCK, tier: 'GATE', category: 'concurrency', question: QUESTION })
   })
 
   test('a question holding a separator stays whole', () => {

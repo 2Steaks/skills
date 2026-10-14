@@ -18,8 +18,10 @@ function world({ git = true } = {}) {
   fs.mkdirSync(home, { recursive: true });
   fs.mkdirSync(path.join(proj, "src"), { recursive: true });
   if (git) execFileSync("git", ["init", "-q", proj]);
-  const run = (script, args = [], cwd = proj) => {
-    const r = spawnSync("node", [path.join(SCRIPTS, script), ...args], { cwd, env: { ...process.env, HOME: home }, encoding: "utf8" });
+  // Each run is one Claude Code session; "s1" unless a test says otherwise.
+  const run = (script, args = [], cwd = proj, session = "s1") => {
+    const env = { ...process.env, HOME: home, CLAUDE_CODE_SESSION_ID: session };
+    const r = spawnSync("node", [path.join(SCRIPTS, script), ...args], { cwd, env, encoding: "utf8" });
     return { code: r.status, out: r.stdout.trim(), err: r.stderr.trim() };
   };
   const read = (p) => fs.readFileSync(path.join(proj, p), "utf8");
@@ -32,7 +34,7 @@ test("setup creates the record and keeps it out of git, once", () => {
   const w = world();
   const first = w.run("setup.mjs");
   assert.equal(first.code, 0);
-  for (const p of [".learning/session.md", ".learning/events.jsonl", ".learning/project"]) assert.ok(w.exists(p), p);
+  for (const p of [".learning/session.md", ".learning/events.jsonl", ".learning/project", ".learning/locks"]) assert.ok(w.exists(p), p);
   assert.ok(fs.existsSync(path.join(w.home, ".learning", "general")));
   assert.match(first.out, /git: kept out of git/);
   const second = w.run("setup.mjs");
@@ -65,41 +67,106 @@ test("setup records which gate is in use", () => {
 
 test("lock opens with the exact line, setting up the record first", () => {
   const w = world();
-  const r = w.run("lock.mjs", ["open", "gate", "concurrency", "One", "run", "or", "two,", "and", "why?"]);
+  const r = w.run("lock.mjs", ["open", "gate", "concurrency", "One", "run", "or", "two,", "and", "why?", "--task", "Make claimSlot safe"]);
   assert.equal(r.code, 0, r.err);
-  assert.equal(w.read(".learning/gate.lock"), "GATE · concurrency · One run or two, and why?\n");
+  const lock = w.read(".learning/locks/s1.lock");
+  assert.equal(lock.split("\n")[0], "GATE · concurrency · One run or two, and why?");
+  assert.match(lock, /^task: Make claimSlot safe$/m);
+  assert.match(lock, /^opened: \d{4}-\d{2}-\d{2}T/m);
   assert.match(w.read(".git/info/exclude"), /^\.learning\/$/m);
   assert.match(w.run("lock.mjs", ["open", "GATE", "concurrency", "Smaller: one or two?"]).out, /^relocked/);
   assert.equal(w.run("lock.mjs", ["show"]).out, "GATE · concurrency · Smaller: one or two?");
+  assert.match(w.read(".learning/locks/s1.lock"), /^task: Make claimSlot safe$/m);
 });
 
-test("lock refuses GO, a CHECK, a bad label and a missing question", () => {
+test("lock refuses GO, a CHECK, a bad label, a missing question and a missing task", () => {
   const w = world();
   assert.match(w.run("lock.mjs", ["open", "GO", "x", "Why?"]).err, /GO never locks/);
   assert.match(w.run("lock.mjs", ["open", "CHECK", "intl", "What does narrow change?"]).err, /a CHECK never locks/);
   assert.match(w.run("lock.mjs", ["open", "GATE", "a · b", "Why?"]).err, /label/);
   assert.match(w.run("lock.mjs", ["open", "GATE", "state"]).err, /question missing/);
-  assert.equal(w.exists(".learning/gate.lock"), false);
+  assert.match(w.run("lock.mjs", ["open", "GATE", "state", "Who owns it?"]).err, /--task/);
+  assert.equal(w.exists(".learning/locks/s1.lock"), false);
 });
 
-test("closing needs a reason the skill allows; a skip isn't one", () => {
+test("closing needs a reason the skill allows; a skip isn't one, and a pause keeps it", () => {
   const w = world();
-  w.run("lock.mjs", ["open", "GATE", "state", "Who owns this state?"]);
+  w.run("lock.mjs", ["open", "GATE", "state", "Who owns this state?", "--task", "Filters"]);
   const skip = w.run("lock.mjs", ["close", "skip"]);
   assert.equal(skip.code, 1);
   assert.match(skip.err, /A skip isn't one/);
-  assert.ok(w.exists(".learning/gate.lock"));
+  assert.match(w.run("lock.mjs", ["close", "paused"]).err, /lock\.mjs pause/);
+  assert.ok(w.exists(".learning/locks/s1.lock"));
   assert.equal(w.run("lock.mjs", ["close", "passed"]).out, "unlocked (passed)");
-  assert.equal(w.run("lock.mjs", ["show"]).out, "none");
-  assert.equal(w.run("lock.mjs", ["close", "paused"]).out, "no lock was open");
+  assert.equal(w.run("lock.mjs", ["show"]).out, "none in this session");
+  assert.equal(w.run("lock.mjs", ["close", "abandoned"]).out, "no lock was open in this session");
 });
 
 test("a lock opened from a subfolder lands at the project root", () => {
   const w = world();
   w.run("setup.mjs");
-  w.run("lock.mjs", ["open", "GATE", "state", "Who owns this state?"], path.join(w.proj, "src"));
-  assert.ok(w.exists(".learning/gate.lock"));
+  w.run("lock.mjs", ["open", "GATE", "state", "Who owns this state?", "--task", "Filters"], path.join(w.proj, "src"));
+  assert.ok(w.exists(".learning/locks/s1.lock"));
   assert.equal(fs.existsSync(path.join(w.proj, "src", ".learning")), false);
+});
+
+test("sessions each get their own lock and never touch each other's", () => {
+  const w = world();
+  w.run("lock.mjs", ["open", "GATE", "data", "Two writes, one crash: what's saved?", "--task", "Save the credential"], w.proj, "s1");
+  assert.equal(w.run("lock.mjs", ["show"], w.proj, "s2").out, "none in this session");
+  assert.equal(w.run("lock.mjs", ["close", "passed"], w.proj, "s2").out, "no lock was open in this session");
+  w.run("lock.mjs", ["open", "GATE", "state", "Who owns the filter?", "--task", "Add a filter"], w.proj, "s2");
+  assert.ok(w.exists(".learning/locks/s1.lock") && w.exists(".learning/locks/s2.lock"));
+  w.run("lock.mjs", ["close", "passed"], w.proj, "s1");
+  assert.equal(w.exists(".learning/locks/s1.lock"), false);
+  assert.equal(w.run("lock.mjs", ["show"], w.proj, "s2").out, "GATE · state · Who owns the filter?");
+});
+
+test("pause keeps a checkpoint for later; another session lists it and picks it up", () => {
+  const w = world();
+  w.run("lock.mjs", ["open", "GATE", "concurrency", "Two claims at once: who owns the slot?", "--task", "Make claimSlot safe"], w.proj, "s1");
+  const paused = w.run("lock.mjs", ["pause", "--step", "step 2 of 3"], w.proj, "s1");
+  assert.equal(paused.code, 0, paused.err);
+  const id = paused.out.match(/paused as (paused-[\w]+)/)[1];
+  assert.equal(w.run("lock.mjs", ["show"], w.proj, "s1").out, "none in this session");
+  const listed = w.run("lock.mjs", ["list"], w.proj, "s2").out;
+  assert.match(listed, new RegExp(`^1 unfinished, newest first:\\n${id} · paused · just now · Make claimSlot safe$`, "m"));
+  assert.match(listed, /^ {2}GATE · concurrency · Two claims at once: who owns the slot\?$/m);
+  assert.match(listed, /^ {2}got to: step 2 of 3$/m);
+  assert.equal(w.run("lock.mjs", ["resume", id], w.proj, "s2").code, 0);
+  const lock = w.read(".learning/locks/s2.lock");
+  assert.equal(lock.split("\n")[0], "GATE · concurrency · Two claims at once: who owns the slot?");
+  assert.match(lock, /^step: step 2 of 3$/m);
+  assert.doesNotMatch(lock, /^paused:/m);
+  assert.equal(w.run("lock.mjs", ["list"], w.proj, "s2").out, "none unfinished");
+  assert.match(w.run("lock.mjs", ["list"], w.proj, "s3").out, /^s2 · open in another session/m);
+});
+
+test("list shows other sessions' open checkpoints, newest first; resume and drop take ids", () => {
+  const w = world();
+  w.run("lock.mjs", ["open", "GATE", "data", "Older question?", "--task", "Older task"], w.proj, "s1");
+  const old = path.join(w.proj, ".learning", "locks", "s1.lock");
+  fs.writeFileSync(old, fs.readFileSync(old, "utf8").replace(/^opened: .*$/m, "opened: 2026-01-01T00:00:00.000Z"));
+  w.run("lock.mjs", ["open", "GATE", "state", "Newer question?", "--task", "Newer task"], w.proj, "s2");
+  const listed = w.run("lock.mjs", ["list"], w.proj, "s3").out.split("\n").filter((l) => !l.startsWith(" "));
+  assert.deepEqual(listed.map((l) => l.split(" · ")[0]), ["2 unfinished, newest first:", "s2", "s1"]);
+  assert.match(listed[1], /open in another session/);
+  assert.match(w.run("lock.mjs", ["list"], w.proj, "s2").out, /^1 unfinished/);
+  w.run("lock.mjs", ["open", "GATE", "security", "Mine?", "--task", "Mine"], w.proj, "s3");
+  assert.match(w.run("lock.mjs", ["resume", "s1"], w.proj, "s3").err, /already has a checkpoint open/);
+  assert.match(w.run("lock.mjs", ["resume", "nope"], w.proj, "s4").err, /no unfinished checkpoint "nope"/);
+  assert.match(w.run("lock.mjs", ["drop", "s1"], w.proj, "s3").out, /^dropped s1: Older task$/);
+  assert.equal(w.exists(".learning/locks/s1.lock"), false);
+});
+
+test("a lock from before sessions were tracked is listed, and resumes into this session", () => {
+  const w = world();
+  w.run("setup.mjs");
+  fs.writeFileSync(path.join(w.proj, ".learning", "gate.lock"), "GATE · concurrency · One run or two?\n");
+  assert.match(w.run("lock.mjs", ["list"]).out, /^legacy · from before sessions were tracked · .* · \(no task given\)$/m);
+  assert.equal(w.run("lock.mjs", ["resume", "legacy"]).code, 0);
+  assert.equal(w.exists(".learning/gate.lock"), false);
+  assert.equal(w.run("lock.mjs", ["show"]).out, "GATE · concurrency · One run or two?");
 });
 
 // ---- record ----

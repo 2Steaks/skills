@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // learning-gate.mjs: blocks code edits while a learning-guardrails checkpoint is open.
-// Lock: <project>/.learning/gate.lock, written by the skill when it asks, deleted when the user passes.
+// Lock: <project>/.learning/locks/<session id>.lock, written by the skill when it asks a GATE question and
+// deleted when the user passes. Each session is held only by its own lock, so sessions never block each other.
 // Hook: PreToolUse on Edit|MultiEdit|Write|NotebookEdit in ~/.claude/settings.json.
 // Exit 2 blocks the edit; anything else fails open, so a broken gate never locks you out.
 // Usage: node learning-gate.mjs --install | --test | --uninstall  (--uninstall is the user's call, never Claude's)
@@ -37,9 +38,9 @@ function check(input) {
   const target = toolInput.file_path ?? toolInput.notebook_path;
   const file = target ? path.resolve(cwd, target) : "";
   if (file && file.split(path.sep).includes(".learning")) return null; // the record can always update
-  const lock = findLock([file && path.dirname(file), process.env.CLAUDE_PROJECT_DIR, cwd]);
+  const lock = findLock([file && path.dirname(file), process.env.CLAUDE_PROJECT_DIR, cwd], input.session_id);
   if (!lock) return null;
-  const question = fs.readFileSync(lock, "utf8").trim() || "(see .learning/session.md)";
+  const question = fs.readFileSync(lock, "utf8").split("\n")[0].trim() || "(see the lock file)";
   return [
     "Learning checkpoint open: code edits are refused until the user shows they understand.",
     `Open question: ${question}`,
@@ -48,12 +49,13 @@ function check(input) {
   ].join("\n");
 }
 
-// Walks up from each start dir looking for .learning/gate.lock.
-function findLock(starts) {
+// Walks up from each start dir looking for this session's lock.
+function findLock(starts, session) {
+  const name = `${String(session || "local").replace(/[^\w-]/g, "") || "local"}.lock`;
   for (const start of starts) {
     if (!start) continue;
     for (let dir = path.resolve(start); ; dir = path.dirname(dir)) {
-      const lock = path.join(dir, ".learning", "gate.lock");
+      const lock = path.join(dir, ".learning", "locks", name);
       if (fs.existsSync(lock)) return lock;
       if (path.dirname(dir) === dir) break;
     }
@@ -96,11 +98,12 @@ function manage(mode) {
 function selfTest() {
   delete process.env.CLAUDE_PROJECT_DIR;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "learning-gate-"));
-  fs.mkdirSync(path.join(root, ".learning"));
-  const edit = (file) => check({ cwd: root, tool_name: "Edit", tool_input: { file_path: path.join(root, file) } });
+  fs.mkdirSync(path.join(root, ".learning", "locks"), { recursive: true });
+  const edit = (file, session = "s1") => check({ cwd: root, session_id: session, tool_name: "Edit", tool_input: { file_path: path.join(root, file) } });
   const results = [["no lock: code edit allowed", edit("src/a.ts") === null]];
-  fs.writeFileSync(path.join(root, ".learning", "gate.lock"), "GATE · test · Why?");
+  fs.writeFileSync(path.join(root, ".learning", "locks", "s1.lock"), "GATE · test · Why?\ntask: test\n");
   results.push(["lock: code edit blocked", edit("src/a.ts")?.includes("Why?") === true]);
+  results.push(["lock: another session's edit allowed", edit("src/a.ts", "s2") === null]);
   results.push(["lock: record edit allowed", edit(".learning/session.md") === null]);
   fs.rmSync(root, { recursive: true, force: true });
   let registered = false;

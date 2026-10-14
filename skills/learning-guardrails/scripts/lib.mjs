@@ -40,7 +40,11 @@ export function projectRoot(start = process.cwd()) {
 }
 
 export const learningDir = (root) => path.join(root, ".learning");
-export const lockPath = (root) => path.join(root, ".learning", "gate.lock");
+// This Claude Code session, as the CLI tells its shell. Elsewhere "local": one lock per project.
+export const sessionId = () => String(process.env.CLAUDE_CODE_SESSION_ID || "local").replace(/[^\w-]/g, "") || "local";
+export const locksDir = (root) => path.join(root, ".learning", "locks");
+export const lockPath = (root, id = sessionId()) => path.join(locksDir(root), `${id}.lock`);
+export const legacyLockPath = (root) => path.join(root, ".learning", "gate.lock");
 export const eventsPath = (root) => path.join(root, ".learning", "events.jsonl");
 export const projectDir = (root) => path.join(root, ".learning", "project");
 
