@@ -278,6 +278,16 @@ test("log: a CHECK can be declined, and the audit counts it", () => {
   assert.match(w.run("analyse.mjs").out, /checkpoints: 1 · declined 1/);
 });
 
+test("log: a reworded question isn't a ladder rung, and the audit counts it", () => {
+  const w = world();
+  const r = w.run("log.mjs", ["checkpoint", JSON.stringify({ task: "t1", tier: "gate", outcome: "passed", help: 0, reworded: 1 })]);
+  assert.equal(r.code, 0, r.err);
+  assert.match(w.run("log.mjs", ["checkpoint", JSON.stringify({ task: "t2", tier: "check", outcome: "passed", reworded: -1 })]).err, /"reworded" must be/);
+  const out = w.run("analyse.mjs").out;
+  assert.match(out, /questions reworded \(assumed too much\): 1/);
+  assert.match(out, /unaided passes: 1 of 1/);
+});
+
 test("architecture is logged and reported, but has no rule patterns", () => {
   const w = world();
   const logged = w.run("log.mjs", ["checkpoint", JSON.stringify({ task: "t1", tier: "gate", outcome: "passed", cats: ["architecture"], concepts: ["url-state"], evidence: "explain", help: 0 })]);

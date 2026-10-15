@@ -26,6 +26,7 @@ const FIELDS = {
   outcome: [(v) => ["passed", "passed_on_record", "declined", "paused", "abandoned", "override"].includes(v), "passed | passed_on_record | declined | paused | abandoned | override"],
   evidence: [(v) => ["predict", "explain", "debug", "experiment", "transfer", "none"].includes(v), "predict | explain | debug | experiment | transfer | none"],
   help: [count, "ladder rungs used, 0 = unaided"],
+  reworded: [count, "rewordings of a question that assumed too much (not ladder rungs)"],
   turns: [count, "exchanges from question to close"],
   skip_reflex: [count, "how many times it fired"],
   new_knowledge: [(v) => typeof v === "boolean", "true | false"],
@@ -39,7 +40,7 @@ const EVENTS = {
   triage: { required: ["task", "tier"], optional: ["cats", "why"] },
   checkpoint: {
     required: ["task", "tier", "outcome"],
-    optional: ["cats", "concepts", "status_before", "focus", "evidence", "help", "turns", "skip_reflex", "new_knowledge", "flagged_unnecessary", "missing"],
+    optional: ["cats", "concepts", "status_before", "focus", "evidence", "help", "reworded", "turns", "skip_reflex", "new_knowledge", "flagged_unnecessary", "missing"],
   },
   diff_review: { required: ["task", "triaged", "actual"], optional: ["added"] },
   override: { required: ["task", "tier", "reason"], optional: ["concepts"] },

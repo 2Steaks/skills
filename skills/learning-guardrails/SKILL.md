@@ -124,6 +124,8 @@ Before any checkpoint, `record.mjs find` the concepts in play (general and proje
 - **A prerequisite with no record** (the concept's `requires`) → never assume it: say it in plain words in the question.
 - **No record** → ask before you teach; "Not sure yet" is always an option. A right pick: record it and move on. Anything else: §3.
 
+Same context means the same mechanism used the same way (library, pattern, constraint), not the same file. Another project's implementation is a new context (§8).
+
 ## 3. Checkpoints
 
 ### Shape
@@ -149,19 +151,21 @@ D. Not sure yet
 
 ### Writing the question
 
+- First, list what the question and lead-in assume: names, syntax, other code, other concepts. Something about this codebase: say it plainly or show it (a hop, a snippet), never lean on code they haven't seen. Another concept the answer needs: `record.mjs find` it; not on record, ask about that first, as its own question.
 - Three real options and "Not sure yet". The right one goes where `pick.mjs` says (`lock.mjs open` says it for a GATE), never where you'd choose: left to you, it lands in the same place every time.
 - Wrong options are misconceptions people actually hold. No trick wording, no trivia, no jokes.
 - Each option makes a claim and gives its reason, so the right pick carries the *why*. One short sentence each, all about the same length: the right one mustn't stand out by being the longest.
-- Plain and literal, as you'd ask a colleague out loud. Name things directly, as the code does: no metaphors or nicknames ("the orphan row"), no form labels ("Break it:"), no jargon the question doesn't need.
+- Plain and literal, as you'd ask a colleague out loud. Say what this codebase's things are ("a removal", "a guest"), not what the code calls them: model, column and function names and framework syntax go in the Where line. A language or library API the question is about (`useEffect`, `Promise.all`) can be named. No metaphors or nicknames ("the orphan row"), no form labels ("Break it:"), no jargon the question doesn't need.
 - The question still makes sense without the lead-in, since the dialog and the pinned band show it alone: what happens, in order, then the one thing to predict, in ≤25 words. Won't fit? It's two questions: ask the one that matters.
 - One concept. Ask what you'd observe (what's saved, sent or shown), not what something is called.
+- The answer follows from what the question and its Where line show. If it hinges on one line (`create`, not `upsert`), that line is a hop.
 - State the codebase facts the question rests on, as what they mean, not their syntax: `@@unique([eventId, personId])` is "only one row per event and person".
 - Mention another part of the codebase only if the project record shows they know it. A comparison ("same shape as Rsvp's") is a second question in disguise.
 - ≤120 words before the question. Lead with what's at stake, for whom, without giving the answer away.
 - Real code from this change, one scenario. Not a textbook example; not three.
 - Good forms: predict ("what happens when…"), break it ("what fails if we remove X?"), choose ("A or B here: what do we give up?"), spot ("which line goes wrong on a slow network?", with the lines as options).
 - Re-asking? The question in full, options and all. Never "see above".
-- Clarifying questions are learning, not stalling: answer in ≤3 lines, then re-ask.
+- Clarifying questions are learning, not stalling: answer in ≤3 lines, then re-ask. One about the code or the wording means the question assumed too much: reword it before re-asking. Their next right pick still counts as unaided; log `reworded`.
 - Never ask "does that make sense?" or "any questions?". They invite a nod.
 - Banned words: "simply", "just", "obviously", "as you know", "easy".
 
@@ -189,9 +193,11 @@ Log which it was as the checkpoint's `missing` (`code`, `concept` or `unclear`).
 
 Not sure a second time → the next rung.
 
+On a question about this code, rung 1's smaller question is the same mechanism without the codebase, in two lines (a users table with a unique email, two inserts). It tells the gaps apart: right there but not here, they know the concept and the gap is applying it here (record it on the project file, §8); wrong there too, it's the concept: rung 2.
+
 If they dispute your verdict, test it. The code is the referee; if you were wrong, say so plainly.
 
-After ~4 exchanges on one checkpoint, stop grinding. Check the concept's `requires` for a missing prerequisite and ask about that first, or offer a pause. Never a skip.
+After ~4 exchanges on one checkpoint, stop grinding: a prerequisite is probably missing. Ask about it first (the concept's `requires`, or what the question assumed), or offer a pause. Never a skip.
 
 ### When it passes
 
@@ -263,7 +269,13 @@ Register only. Write your own; never use these as written:
 - **Project knowledge** (how *this* app achieves idempotency) lives in `<repo>/.learning/project/`: `record.mjs update <concept> --project --general idempotency`.
 - Project details, APIs and architecture never transfer automatically: check them once per project.
 
-`record.mjs` enforces the rest. Your part: a miss on a sub-aspect is a `--gap`, a miss on the core is `needs-reinforcement`, and a miss on how this codebase works goes in the project file (`--project`), never down as a general gap. A right pick on a concept first shown in another project is `transfer` evidence; notes summarise their reasoning in words, never code or chat quotes; `find` before creating, so there's no `db-indexes` next to `database-indexes`.
+`record.mjs` enforces the rest. Your part:
+
+- A miss on a sub-aspect is a `--gap`; a miss on the core is `needs-reinforcement`.
+- A miss applying a concept they know in general goes on the project file (`--project --general <concept> --gap "<what>"`) and leaves the general status alone, unless it shows the core misconception.
+- A question that assumed too much isn't their miss at all (§3).
+- Notes summarise their reasoning in words, never code or chat quotes. `find` before creating, so there's no `db-indexes` next to `database-indexes`.
+- A right pick on a concept first shown in another project is `transfer` evidence.
 
 **"What have I learned?"**: `record.mjs summary`, then two lines of your own at most.
 
@@ -273,7 +285,7 @@ Register only. Write your own; never use these as written:
 
 - With the mod on, it logs the mechanical events itself (`"by":"mod"`: triage, gate open and close, refused edits). Yours are the judgement calls: `checkpoint`, `diff_review`, `override`, `disputed`, `pause`, `resume`.
 - A `checkpoint` is one line, written when it closes (passed, passed_on_record, declined, paused, abandoned, override), never while it's open.
-- `task` is a short id shared by one task's events. `help` counts ladder rungs used (0 = unaided). `new_knowledge` is false when it only repeated mastered material. `flagged_unnecessary: true` when the user calls a checkpoint pointless and, on review, you agree.
+- `task` is a short id shared by one task's events. `help` counts ladder rungs used (0 = unaided); `reworded` counts rewordings of a question that assumed too much, which aren't rungs. `new_knowledge` is false when it only repeated mastered material. `flagged_unnecessary: true` when the user calls a checkpoint pointless and, on review, you agree.
 
 ## 10. Self-evaluation
 
