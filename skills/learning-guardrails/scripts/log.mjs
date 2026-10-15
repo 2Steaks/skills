@@ -33,13 +33,14 @@ const FIELDS = {
   flagged_unnecessary: [(v) => v === true, "true, when the user called it pointless and you agree"],
   why: [code, "a short code (copy-change, non-functional-edit)"],
   reason: [code, "a short code (incident, throwaway, one-off)"],
+  missing: [(v) => ["code", "concept", "unclear"].includes(v), "code | concept | unclear: what a 'not sure' turned out to be"],
 };
 
 const EVENTS = {
   triage: { required: ["task", "tier"], optional: ["cats", "why"] },
   checkpoint: {
     required: ["task", "tier", "outcome"],
-    optional: ["cats", "concepts", "status_before", "focus", "evidence", "help", "reworded", "turns", "skip_reflex", "new_knowledge", "flagged_unnecessary"],
+    optional: ["cats", "concepts", "status_before", "focus", "evidence", "help", "reworded", "turns", "skip_reflex", "new_knowledge", "flagged_unnecessary", "missing"],
   },
   diff_review: { required: ["task", "triaged", "actual"], optional: ["added"] },
   override: { required: ["task", "tier", "reason"], optional: ["concepts"] },
