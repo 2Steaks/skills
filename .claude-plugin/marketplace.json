@@ -14,7 +14,7 @@
     },
     {
       "name": "learning-gate",
-      "description": "Enforces learning-guardrails: keeps it opt-in, blocks code edits while a checkpoint is open and pins the open question above the prompt.",
+      "description": "Enforces learning-guardrails: keeps it opt-in, makes Claude triage before editing, checks each edit against the risk rules, blocks code edits while a checkpoint is open and pins the open question above the prompt.",
       "source": "./plugins/learning-gate"
     },
     {

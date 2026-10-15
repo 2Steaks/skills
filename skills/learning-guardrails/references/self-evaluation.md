@@ -16,6 +16,7 @@ Optimise for learning, retained understanding, engineering independence and usef
   - unaided passes, evidence types, repeat teaching, concepts that keep exposing gaps, the skip-reflex trend
   - overhead: turns, checkpoints per task, and the mod's time-open and refused edits
   - `diff_review` mismatches, as missed risk or over-triage
+  - the mod's tripwire: edits refused before any triage, edits the packs flagged that triage hadn't covered, and ratings below the packs, with their reasons
   - record drift: passes with no evidence line that day
   - with `--git`, commits that carry GATE signals on a day with no gate: possible misses for review
 - `scripts/bench.mjs [--rules <file>] [--cases <file>] [--proposed <file>]` runs the benchmark cases against the triage rules, the record logic and the override policy. `--rules` and `--proposed` put one more file on top of the rules in force: a pack, a layer or an old full copy. With `--proposed` it lists every case that became **more permissive** (risk under-tiered, a needed check dropped) or **more intrusive** (GO over-tiered, a mastered concept retaught), and fails if any case's expectation breaks.
@@ -39,7 +40,7 @@ Both are deterministic: no network, randomness or AI. Subjective questions (does
 3. **Propose**: one specific change to detection rules, checkpoint selection, the record model or enforcement, written to `.learning/proposals/<date>-<slug>.md`.
 4. **Test**: `bench.mjs --proposed <file>`: current vs proposed.
 5. **Review**: show the user the change, the evidence, the benchmark diff, the trade-offs and how to revert it, in ≤10 lines.
-6. **Apply**: only on an explicit yes. Keep it reversible: log old → new in a `rules-changelog.md` beside the layer you changed. Changes to this skill itself go to the user as a proposed edit.
+6. **Apply**: only on an explicit yes. Keep it reversible: log old → new in a `rules-changelog.md` beside the layer you changed, then rerun `setup.mjs` so the mod checks edits against the new rules. Changes to this skill itself go to the user as a proposed edit.
 7. **Reassess**: the next report checks the targeted metric moved.
 
 ## Who may change what

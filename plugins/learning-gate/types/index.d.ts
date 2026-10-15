@@ -10,6 +10,16 @@ export type GateLock = {
   question: string
 }
 
+/** What triage since the user's last message covers, for the tripwire. */
+export type Cover = {
+  /** A triage line, or an open checkpoint, has come since the user's last message. */
+  triaged: boolean
+  /** Risk categories a GATE line or an open checkpoint covers. */
+  gated: readonly string[]
+  /** Risk categories a triage line rated lower with a reason (`· not security: rename`). */
+  waived: readonly string[]
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'learning-gate': {
@@ -23,6 +33,8 @@ declare module 'claude-code' {
       named: boolean
       /** Checkpoints left in the project by other sessions, or paused: /pickup's menu. */
       unfinished: number
+      /** What triage since the user's last message covers: the tripwire reads it. */
+      cover: Cover
     }
   }
 }

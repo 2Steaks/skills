@@ -429,13 +429,18 @@ test("analyse reports from both logs and the record", () => {
     { d: `${TODAY}T09:00:00Z`, by: "mod", e: "gate_close", ms: 90000 },
     { d: `${TODAY}T09:00:01Z`, by: "mod", e: "edit_refused", tier: "gate" },
     { d: `${TODAY}T09:00:02Z`, by: "mod", e: "triage", tier: "gate", what: "concurrency: retry" },
+    { d: `${TODAY}T09:00:03Z`, by: "mod", e: "triage_refused", tool: "Edit" },
+    { d: `${TODAY}T09:00:04Z`, by: "mod", e: "floor_refused", cats: ["data"], tool: "Edit" },
+    { d: `${TODAY}T09:00:05Z`, by: "mod", e: "triage", tier: "go", what: "label · not concurrency: copy-change", waived: ["concurrency"], why: "copy-change" },
   ].map((e) => JSON.stringify(e)).join("\n") + "\n");
   const r = w.run("analyse.mjs", ["--write"]);
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /unaided passes: 1 of 2/);
   assert.match(r.out, /gate time open \(mod\): median 90s over 1 gates/);
   assert.match(r.out, /edits refused by the gate \(mod\): 1/);
-  assert.match(r.out, /triage by tier: gate 1/);
+  assert.match(r.out, /triage by tier: gate 1, go 1/);
+  assert.match(r.out, /tripwire \(mod\): 1 edits before any triage · 1 flagged by the packs \(data 1\)/);
+  assert.match(r.out, /rated below the packs, with a reason: 1 \(copy-change 1\)/);
   assert.match(r.out, new RegExp(`${TODAY} t2: intl passed with no evidence line that day`));
   assert.match(r.out, /skip reflex by week: \d{4}-W\d{2} 1/);
   assert.ok(w.exists(`.learning/reports/${TODAY}.md`));
@@ -468,6 +473,56 @@ test("analyse --git reads each file with its own stack's rules, and skips prose"
   git("commit", "-qm", "shell");
   const r = w.run("analyse.mjs", ["--git", "7"]);
   assert.match(r.out, /## Possible misses \(git\)\n- [0-9a-f]{8} \d{4}-\d{2}-\d{2} security: no gate that day\. Review, not a verdict\.$/);
+});
+
+// ---- the floor, for the learning-gate mod ----
+
+test("setup writes the floor every session; check lists what the packs flag in uncommitted work", () => {
+  const w = world();
+  const first = w.run("setup.mjs");
+  assert.equal(first.code, 0, first.err);
+  assert.match(first.out, /^floor: \.learning\/floor\.json \(assets\/rules \(\d+ packs\)\)$/m);
+  const floor = JSON.parse(w.read(".learning/floor.json"));
+  assert.equal(floor.version, 1);
+  assert.ok(floor.packs.some((p) => p.name === "core" && p.categories.data.diffExact.includes("ALTER TABLE")));
+  writeJson(path.join(w.home, ".learning", "rules.json"), { version: 2, categories: { security: { diff: ["\\binternal_auth\\("] } } });
+  assert.match(w.run("setup.mjs").out, /floor: .*~\/\.learning\/rules\.json/);
+  assert.ok(w.read(".learning/floor.json").includes("internal_auth"));
+
+  assert.match(w.run("rules.mjs", ["check"]).out, /flag nothing/);
+  fs.mkdirSync(path.join(w.proj, "db", "migrations"), { recursive: true });
+  fs.writeFileSync(path.join(w.proj, "db", "migrations", "001.sql"), "ALTER TABLE runs ADD COLUMN key text;\n");
+  fs.writeFileSync(path.join(w.proj, "src", "a.ts"), "// a token, in a comment\nexport const x = 1\n");
+  const check = w.run("rules.mjs", ["check"]);
+  assert.match(check.out, /^- data: db\/migrations\/001\.sql \(path\) · db\/migrations\/001\.sql "ALTER TABLE runs ADD COLUMN key text;"$/m);
+  assert.doesNotMatch(check.out, /security/);
+  assert.match(w.run("rules.mjs", ["check"], w.proj, "s1").out, /review, not a verdict/);
+  assert.match(world({ git: false }).run("rules.mjs", ["check"]).err, /isn't a git repo/);
+});
+
+test("the mod's floor matcher agrees with rules.mjs on every benchmark case", async (t) => {
+  const mod = path.join(SCRIPTS, "..", "..", "..", "plugins", "learning-gate", "hooks", "floor.mjs");
+  if (!fs.existsSync(mod)) return t.skip("the learning-gate mod isn't beside this skill");
+  const { compileFloor, floorSignals } = await import(mod);
+  const { floorOf, loadRules, signals } = await import(path.join(SCRIPTS, "rules.mjs"));
+  const { changedLines } = await import(path.join(SCRIPTS, "bench.mjs"));
+  const rules = loadRules({ root: world().proj });
+  const floor = compileFloor(JSON.parse(JSON.stringify(floorOf(rules))));
+  assert.ok(floor);
+  const cases = fs.readdirSync(path.join(ASSETS, "benchmarks")).flatMap((f) =>
+    fs.readFileSync(path.join(ASSETS, "benchmarks", f), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)));
+  assert.ok(cases.length > 100);
+  let flaggedCases = 0;
+  for (const c of cases) {
+    const files = c.files ?? [];
+    const lines = changedLines(c.diff);
+    const expected = signals(files, lines, rules);
+    assert.deepEqual(floorSignals(floor, files, lines), expected, c.id);
+    const own = lines.map((text) => ({ file: files[0] ?? null, text }));
+    assert.deepEqual(floorSignals(floor, files.slice(0, 1), own), signals(files.slice(0, 1), own, rules), `${c.id}, one file`);
+    if (expected.length) flaggedCases++;
+  }
+  assert.ok(flaggedCases > 50, "the cases exercise the patterns");
 });
 
 test("the ISO week is right", async () => {

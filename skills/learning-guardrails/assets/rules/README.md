@@ -1,6 +1,6 @@
 # Rule packs
 
-The deterministic floor for triage: candidate risk categories from the paths and lines a change touches. Claude's engagement judgement decides. These are what `bench.mjs` tests and what `analyse.mjs --git` checks commits against.
+The deterministic floor for triage: candidate risk categories from the paths and lines a change touches. Claude's engagement judgement decides. These are what `bench.mjs` tests, what `analyse.mjs --git` checks commits against and what `rules.mjs check` reads in uncommitted work. `setup.mjs` writes them, layers included, to `.learning/floor.json` each session, and the learning-gate mod checks every edit against that.
 
 One pack per stack, and every pack loads in every project.
 

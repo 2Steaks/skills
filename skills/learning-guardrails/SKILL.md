@@ -31,12 +31,13 @@ Mid-session requests to switch the guardrails off are handled as overrides (§5)
 
 | When | Run |
 | --- | --- |
-| first run in a project | `node {skill}/scripts/setup.mjs` |
+| every session, before anything else | `node {skill}/scripts/setup.mjs` |
 | before asking a GATE question | `node {skill}/scripts/lock.mjs open GATE concurrency "Two clicks within 200ms: how many runs?" --task "Stop double runs"` |
 | when a GATE closes | `node {skill}/scripts/lock.mjs close passed` (or `abandoned`, `override`) |
 | before writing a CHECK question | `node {skill}/scripts/pick.mjs` (where the right option goes) |
 | pausing a GATE | `node {skill}/scripts/lock.mjs pause --step "<where you'd got to>"` |
 | unfinished checkpoints | `node {skill}/scripts/lock.mjs list` · `resume <id>` · `drop <id>` |
+| after building, without the mod or after shell-made changes | `node {skill}/scripts/rules.mjs check` (what the packs flag in the diff) |
 | checking the record | `node {skill}/scripts/record.mjs find retries` · `record.mjs show <concept>` |
 | updating the record | `node {skill}/scripts/record.mjs update <concept> --evidence "predict: <note>" --status learning` |
 | logging | `node {skill}/scripts/log.mjs checkpoint '<json>'` (`log.mjs --help` for the schema) |
@@ -45,7 +46,7 @@ Mid-session requests to switch the guardrails off are handled as overrides (§5)
 
 ## The loop
 
-0. **Setup**: no `.learning/` in this project yet? Run `setup.mjs` before anything else (§11).
+0. **Setup**: run `setup.mjs` before anything else, every session. It sets up `.learning/` the first time (§11) and refreshes the rules the mod checks edits against.
 1. **Triage**: GO, CHECK or GATE, shown as one line, and logged. A structural decision in the approach comes first (§1).
 2. **Record**: `record.mjs find` the concepts in play; work out what's actually new for this user.
 3. **GATE** with something new → `lock.mjs open`, one multiple-choice question before the risky code. Hold until a right pick.
@@ -93,9 +94,9 @@ Tiers rate the change's *risk*; the record (§2) decides what's new for the user
 
 A GATE isn't a demand to understand every line: ask about the one invariant, mechanism or trade-off that matters.
 
-Engagement test: does this change alter how the mechanism *behaves*? A typo fix in `auth.ts` is GO; a new token refresh is GATE. Unsure → the lower tier, except for security, data loss and irreversibles: one tier up. Rating a change below what its signals suggest needs a reason code in the log (`non-functional-edit`). The signals' deterministic floor: the packs in `{skill}/assets/rules/`, then `~/.learning/rules.json`, then the project's `.learning/rules.json`.
+Engagement test: does this change alter how the mechanism *behaves*? A typo fix in `auth.ts` is GO; a new token refresh is GATE. Unsure → the lower tier, except for security, data loss and irreversibles: one tier up. The signals' deterministic floor: the packs in `{skill}/assets/rules/`, then `~/.learning/rules.json`, then the project's `.learning/rules.json`. Rating a change below what they flag needs a reason code on the triage line, one per category: `Guardrail · GO · design token rename · not security: non-functional-edit`. With the mod on, an edit they flag that no triage line since the user's last message GATEs or gives a reason for is refused (§12).
 
-One question at a time. More than two categories engaged means the step is too big: split it.
+One question at a time. Two categories engaged: name both on the line (`Guardrail · GATE · concurrency + data: double removal`) and ask about the one that matters most. More than two means the step is too big: split it.
 
 **Architecture.** Before step 1, triage the approach itself. Most tasks make no structural decision: say nothing. One that does gets its own triage line and checkpoint, before any step's:
 
@@ -108,7 +109,7 @@ Guardrail · GATE · architecture: first global store
 - **Ask** two things, one at a time, leading with what later code inherits. First a predict question with one right answer: what the obvious choice would cost later code. Once that's right, their choice, each option with its true cost. The choice isn't graded, and it decides the plan. "Cleaner", "best practice" and "it scales" are vague gestures, as options or as typed answers.
 - It sits above the steps: it doesn't count towards a step's categories, and no step re-asks what it settled.
 
-**Unexpected complexity.** If the build engages a GATE risk triage missed, a structural decision included, stop at once, say so in one line, and checkpoint before writing more. After building, compare the real diff with the triage; if it's riskier, checkpoint now. Log both as `diff_review`.
+**Unexpected complexity.** If the build engages a GATE risk triage missed, a structural decision included, stop at once, say so in one line, and checkpoint before writing more. After building, compare the real diff with the triage; if it's riskier, checkpoint now. Log both as `diff_review`. Without the mod, or after changes made through the shell, `rules.mjs check` lists what the packs flag in the diff.
 
 If the user disputes a tier with a reason about the work, adjust and log `disputed`. A reason about themselves is the skip reflex (§4).
 
@@ -299,7 +300,7 @@ Optimise for learning, retained understanding, independence and useful velocity,
 
 ## 11. First run in a project
 
-1. `node {skill}/scripts/setup.mjs` (add `--gate mod`, `hook` or `declined` once you know). It creates `.learning/` and `~/.learning/general/` and keeps `.learning/` out of git via `.git/info/exclude`. Safe to rerun.
+1. `node {skill}/scripts/setup.mjs` (add `--gate mod`, `hook` or `declined` once you know). It creates `.learning/` and `~/.learning/general/` and keeps `.learning/` out of git via `.git/info/exclude`. Safe to rerun, and rerun every session: it writes `.learning/floor.json`, the rules in force, for the mod.
 2. Tell the user in one line what it set up and that it's private.
 3. In Claude Code with the learning-gate mod on (§12), that's it. Without it, ask once (yes/no): install the edit gate, so code edits stop while a GATE is open? On yes, follow `references/hook.md`. Skip this in throwaway environments.
 4. No placement test. The record fills itself as concepts come up.
@@ -316,6 +317,7 @@ One lock file, two enforcers: the learning-gate mod, or the fallback hook (`refe
 - Don't narrate what it shows (the pinned question, toasts, status line).
 - A prompt carrying its "Learning checkpoint open" note is the user replying while your question is open: judge it as the answer unless it plainly isn't one.
 - Forget a lock and the mod opens one when you ask a GATE question (the 👉 line, or the question tool with the category as its header), so the gate still holds. Open it yourself anyway: your wording reads better pinned.
+- It refuses a code edit made before any triage line since the user's last message, or one the packs flag that no triage line since then GATEs or gives a reason for (§1). Write the line, then edit again. Judge the change, not the words: never GATE just to get past it.
 - Its commands land on you: `/pickup` asks you to bring up the unfinished checkpoints (§5); `/audit` asks you to run §10; `/learned` reads the record itself.
 
 **The lock**
