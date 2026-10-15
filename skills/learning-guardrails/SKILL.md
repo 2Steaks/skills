@@ -121,6 +121,7 @@ Before any checkpoint, `record.mjs find` the concepts in play (general and proje
 - **Familiar, with a new variation** → skip the intro; ask only about the delta (composite index column order, not "what's an index").
 - **Touches a known gap** → ask about that gap.
 - **Learning or needs reinforcement, and in play now** → one quick question, not a lesson. Never interrupt unrelated work for revision.
+- **A prerequisite with no record** (the concept's `requires`) → never assume it: say it in plain words in the question.
 - **No record** → ask before you teach; "Not sure yet" is always an option. A right pick: record it and move on. Anything else: §3.
 
 ## 3. Checkpoints
@@ -154,6 +155,8 @@ D. Not sure yet
 - Plain and literal, as you'd ask a colleague out loud. Name things directly, as the code does: no metaphors or nicknames ("the orphan row"), no form labels ("Break it:"), no jargon the question doesn't need.
 - The question still makes sense without the lead-in, since the dialog and the pinned band show it alone: what happens, in order, then the one thing to predict, in ≤25 words. Won't fit? It's two questions: ask the one that matters.
 - One concept. Ask what you'd observe (what's saved, sent or shown), not what something is called.
+- State the codebase facts the question rests on, as what they mean, not their syntax: `@@unique([eventId, personId])` is "only one row per event and person".
+- Mention another part of the codebase only if the project record shows they know it. A comparison ("same shape as Rsvp's") is a second question in disguise.
 - ≤120 words before the question. Lead with what's at stake, for whom, without giving the answer away.
 - Real code from this change, one scenario. Not a textbook example; not three.
 - Good forms: predict ("what happens when…"), break it ("what fails if we remove X?"), choose ("A or B here: what do we give up?"), spot ("which line goes wrong on a slow network?", with the lines as options).
@@ -176,7 +179,15 @@ One rung per message, without judgement. At GATE the lock stays: when the questi
 2. Show it: a tiny demo or an experiment you actually run (seeing beats reading), or explain directly in ≤5 lines.
 3. One fresh variant to confirm: reading isn't evidence. At CHECK, skip this: explain and move on.
 
-"Not sure yet" moves them one rung on and never counts as a miss: it's the honest answer.
+"Not sure yet" never counts as a miss: it's the honest answer. Ask what's missing, one click, then help with that:
+
+- **How this code works** → show the path (the Where hops, ≤3 lines on what each does today, never what the change will do: that's the answer), then the same question again. It's project knowledge, not a gap in the idea.
+- **The idea itself** → rung 2, then a fresh variant.
+- **The question's unclear** → reword it and ask again. That's your miss, not theirs.
+
+Log which it was as the checkpoint's `missing` (`code`, `concept` or `unclear`).
+
+Not sure a second time → the next rung.
 
 If they dispute your verdict, test it. The code is the referee; if you were wrong, say so plainly.
 
@@ -252,7 +263,7 @@ Register only. Write your own; never use these as written:
 - **Project knowledge** (how *this* app achieves idempotency) lives in `<repo>/.learning/project/`: `record.mjs update <concept> --project --general idempotency`.
 - Project details, APIs and architecture never transfer automatically: check them once per project.
 
-`record.mjs` enforces the rest. Your part: a miss on a sub-aspect is a `--gap`, a miss on the core is `needs-reinforcement`; notes summarise their reasoning in words, never code or chat quotes; `find` before creating, so there's no `db-indexes` next to `database-indexes`.
+`record.mjs` enforces the rest. Your part: a miss on a sub-aspect is a `--gap`, a miss on the core is `needs-reinforcement`, and a miss on how this codebase works goes in the project file (`--project`), never down as a general gap. A right pick on a concept first shown in another project is `transfer` evidence; notes summarise their reasoning in words, never code or chat quotes; `find` before creating, so there's no `db-indexes` next to `database-indexes`.
 
 **"What have I learned?"**: `record.mjs summary`, then two lines of your own at most.
 

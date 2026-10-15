@@ -263,6 +263,15 @@ test("log refuses what the schema doesn't allow", () => {
   assert.equal(w.exists(".learning/events.jsonl") ? w.read(".learning/events.jsonl").trim() : "", "");
 });
 
+test("log: what a 'not sure' was missing is recorded, and the audit counts it", () => {
+  const w = world();
+  for (const missing of ["code", "code", "unclear"]) {
+    assert.equal(w.run("log.mjs", ["checkpoint", JSON.stringify({ task: "t1", tier: "gate", outcome: "passed", missing })]).code, 0);
+  }
+  assert.match(w.run("log.mjs", ["checkpoint", JSON.stringify({ task: "t1", tier: "gate", outcome: "passed", missing: "vibes" })]).err, /"missing" must be code \| concept \| unclear/);
+  assert.match(w.run("analyse.mjs").out, /not sure, and what was missing: code 2, unclear 1/);
+});
+
 test("log: a CHECK can be declined, and the audit counts it", () => {
   const w = world();
   assert.equal(w.run("log.mjs", ["checkpoint", JSON.stringify({ task: "t1", tier: "check", outcome: "declined", concepts: ["intl"] })]).code, 0);
