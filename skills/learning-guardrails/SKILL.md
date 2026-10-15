@@ -34,6 +34,7 @@ Mid-session requests to switch the guardrails off are handled as overrides (§5)
 | first run in a project | `node {skill}/scripts/setup.mjs` |
 | before asking a GATE question | `node {skill}/scripts/lock.mjs open GATE concurrency "Two clicks within 200ms: how many runs?" --task "Stop double runs"` |
 | when a GATE closes | `node {skill}/scripts/lock.mjs close passed` (or `abandoned`, `override`) |
+| before writing a CHECK question | `node {skill}/scripts/pick.mjs` (where the right option goes) |
 | pausing a GATE | `node {skill}/scripts/lock.mjs pause --step "<where you'd got to>"` |
 | unfinished checkpoints | `node {skill}/scripts/lock.mjs list` · `resume <id>` · `drop <id>` |
 | checking the record | `node {skill}/scripts/record.mjs find retries` · `record.mjs show <concept>` |
@@ -147,7 +148,7 @@ D. Not sure yet
 
 ### Writing the question
 
-- Three real options and "Not sure yet". Vary where the right one sits: never the same letter twice running.
+- Three real options and "Not sure yet". The right one goes where `pick.mjs` says (`lock.mjs open` says it for a GATE), never where you'd choose: left to you, it lands in the same place every time.
 - Wrong options are misconceptions people actually hold. No trick wording, no trivia, no jokes.
 - Each option makes a claim and gives its reason, so the right pick carries the *why*. One short sentence each, all about the same length: the right one mustn't stand out by being the longest.
 - Plain and literal, as you'd ask a colleague out loud. Name things directly, as the code does: no metaphors or nicknames ("the orphan row"), no form labels ("Break it:"), no jargon the question doesn't need.

@@ -15,6 +15,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fail, isMain, legacyLockPath, lockPath, locksDir, parseArgs, projectRoot, sessionKnown } from "./lib.mjs";
+import { pick } from "./pick.mjs";
 import { setup } from "./setup.mjs";
 
 const REASONS = ["passed", "abandoned", "override"];
@@ -173,6 +174,7 @@ if (isMain(import.meta.url)) {
     const [tier, label, ...words] = args;
     const { existed, line } = open(tier, label, words, flags);
     console.log(`${existed ? "relocked" : "locked"} (this session): ${line}`);
+    console.log(`right answer at: ${pick()}`);
     if (line.length > 220) console.log("note: long for the band above the prompt; it will wrap");
   } else if (cmd === "close") {
     console.log(close(args[0]) ? `unlocked (${args[0]})` : "no lock was open in this session");
