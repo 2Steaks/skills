@@ -183,6 +183,18 @@ test("a lock from before sessions were tracked is listed, and resumes into this 
   assert.equal(w.run("lock.mjs", ["show"]).out, "GATE · concurrency · One run or two?");
 });
 
+test("pick puts the right answer at A, B or C evenly; lock.mjs open says where too", async () => {
+  const { pick } = await import(path.join(SCRIPTS, "pick.mjs"));
+  const counts = { A: 0, B: 0, C: 0 };
+  for (let i = 0; i < 3000; i++) counts[pick()]++;
+  for (const n of Object.values(counts)) assert.ok(n > 850 && n < 1150, JSON.stringify(counts));
+  assert.deepEqual(Object.keys(counts).sort(), ["A", "B", "C"]);
+  const w = world();
+  assert.match(w.run("pick.mjs").out, /^right answer at: [ABC]$/);
+  assert.match(w.run("pick.mjs", ["9"]).err, /2 to 8/);
+  assert.match(w.run("lock.mjs", ["open", "GATE", "data", "Which write lands?", "--task", "Save it"]).out, /\nright answer at: [ABC]$/);
+});
+
 // ---- record ----
 
 test("record creates a concept and appends dated evidence", () => {
