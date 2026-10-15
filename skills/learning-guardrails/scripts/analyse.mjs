@@ -70,6 +70,7 @@ export function report(events, concepts, { bad = 0, misses = null } = {}) {
   out.push(`- override rate: ${pct(checkpoints.filter((e) => e.outcome === "override").length, checkpoints.length)}`);
   out.push(`- flagged unnecessary: ${checkpoints.filter((e) => e.flagged_unnecessary).length}`);
   out.push(`- questions reworded (assumed too much): ${checkpoints.filter((e) => e.reworded > 0).length}`);
+  out.push(`- not sure, and what was missing: ${show(tally(checkpoints.flatMap((e) => (e.missing ? [e.missing] : []))))}`);
   out.push("");
 
   out.push("## Learning, not compliance");
