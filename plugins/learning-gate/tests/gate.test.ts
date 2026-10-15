@@ -1,7 +1,11 @@
 import type { On } from 'claude-code'
 import { describe, expect, mock, test, type TestBody } from 'claude-code/testing'
 
-import { askedCheckpoint, askedInDialog, clean, isInRecord, parseConcept, parseLock, summarise } from '../hooks/register'
+import { changedLines, compileFloor, floorSignals } from '../hooks/floor.mjs'
+import { askedCheckpoint, askedInDialog, clean, isInRecord, parseConcept, parseLock, summarise, triageLines } from '../hooks/register'
+
+// The test environment's timer, which its declarations leave out.
+declare const setTimeout: (callback: (...args: never[]) => void, ms?: number) => unknown
 
 const CWD = '/proj'
 const SESSION = 'sess-1'
@@ -164,7 +168,7 @@ describe('telling the shells', () => {
     const sets: { name: string; value?: string }[] = []
     on('env.set', ($, e) => {
       sets.push({ name: e.name, value: e.value })
-      return { value: undefined }
+      return { value: {} }
     })
     await $.tool.call({ tool: 'Bash', command: 'node lock.mjs show' })
     expect(sets).toEqual([{ name: 'LEARNING_GATE_SESSION', value: SESSION }])
@@ -358,6 +362,7 @@ describe('opt-in', () => {
     await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
     await $.prompt.submit(prompt('add a timeout'))
     expect(context).toBeUndefined()
+    await append($, reply('Guardrail · GO · timeout value', 'r10'))
     expect((await $.tool.call(edit('/proj/src/a.ts'))).deny).toBeUndefined()
     for (const surface of SURFACES) {
       const ui = await $.ui.mount({ ...BAND, surface })
@@ -565,5 +570,175 @@ describe('parsing', () => {
     const text = '---\nconcept: retries\nstatus: needs-reinforcement\n---\n## Known gaps\n- one\n- two\n\n## Other\n- not a gap\n'
     expect(parseConcept('retries.md', text)).toEqual({ name: 'retries', status: 'needs-reinforcement', gaps: 2 })
     expect(summarise([])).toContain('Nothing recorded yet')
+  })
+})
+
+const FLOOR_FILE = '/proj/.learning/floor.json'
+// A floor as the skill writes it (rules.mjs floorOf), cut down to a few real patterns.
+const FLOOR = JSON.stringify({
+  version: 1,
+  sources: 'assets/rules (test)',
+  commentOnly: true,
+  comment: '^\\s*$|^\\s*(\\/\\/|\\/\\*|\\*(\\s|\\/|$)|#(?!!?\\[)|<!--)',
+  ignore: ['\\.(md|markdown|rst|adoc)$'],
+  packs: [
+    {
+      name: 'core',
+      files: null,
+      categories: {
+        data: { paths: ['(^|/)migrations?/'], diff: ['\\btransaction\\b'], diffExact: ['\\bDELETE FROM\\b'] },
+        security: { paths: ['(^|/)auth'], diff: ['\\btoken\\b'], diffExact: [] },
+      },
+    },
+  ],
+})
+
+describe('the tripwire', () => {
+  const tripWorld = (on: On, extra: Record<string, string> = {}) => {
+    const w = world(on, { '/proj/.learning/session.md': '## Now', [FLOOR_FILE]: FLOOR, ...extra })
+    on('prompt.submit', ($, e) => ({ text: e.text }))
+    return w
+  }
+  const start = async ($: Parameters<TestBody>[0]) => {
+    await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
+    await $.prompt.submit(prompt('add a timeout'))
+  }
+  const change = (file_path: string, old_string: string, new_string: string) => ({ tool: 'Edit' as const, file_path, old_string, new_string })
+
+  test('no triage since the last message: a code edit is refused until the line comes', async ($, on) => {
+    const { files } = tripWorld(on)
+    await start($)
+    expect(refusal(await $.tool.call(edit('/proj/src/a.ts')))).toContain('triage before building')
+    await append($, reply('Guardrail · GO · timeout value', 't1'))
+    expect((await $.tool.call(edit('/proj/src/a.ts'))).deny).toBeUndefined()
+    expect(events(files).map(e => e.e)).toEqual(['triage_refused', 'triage'])
+  })
+
+  test('prose needs no triage, and without a floor only the triage check holds', async ($, on) => {
+    world(on, { '/proj/.learning/session.md': '## Now' })
+    on('prompt.submit', ($, e) => ({ text: e.text }))
+    await start($)
+    expect((await $.tool.call(edit('/proj/docs/notes.md'))).deny).toBeUndefined()
+    expect(refusal(await $.tool.call(edit('/proj/src/a.ts')))).toContain('triage before building')
+    await append($, reply('Guardrail · GO · rename', 't2'))
+    expect((await $.tool.call(change('/proj/src/db.ts', 'x', 'await db.transaction(fn)'))).deny).toBeUndefined()
+  })
+
+  test('an edit the packs flag needs a GATE for its category, or a reason', async ($, on) => {
+    const { files } = tripWorld(on)
+    await start($)
+    expect((await $.tool.call(edit('/proj/README.md'))).deny).toBeUndefined()
+    await append($, reply('Guardrail · GO · tidy the save', 't3'))
+    const flagged = refusal(await $.tool.call(change('/proj/src/db.ts', 'save(a)', 'await db.transaction(() => save(a))')))
+    expect(flagged).toContain('src/db.ts as data ("await db.transaction(() => save(a))")')
+    expect(flagged).toContain('· not data: <reason-code>')
+    await append($, reply('Guardrail · GATE · data: both writes in one transaction', 't4'))
+    expect((await $.tool.call(change('/proj/src/db.ts', 'save(a)', 'await db.transaction(() => save(a))'))).deny).toBeUndefined()
+    expect(events(files).filter(e => e.e === 'floor_refused')).toMatchObject([{ cats: ['data'], tool: 'Edit' }])
+  })
+
+  test('a GATE line can name two categories, and covers both', async ($, on) => {
+    tripWorld(on)
+    await start($)
+    await append($, reply('Guardrail · GATE · concurrency + data: a double removal', 't11'))
+    expect((await $.tool.call({ tool: 'Write', file_path: '/proj/db/migrations/002.sql', content: 'CREATE UNIQUE INDEX x;\n' })).deny).toBeUndefined()
+    expect(refusal(await $.tool.call(change('/proj/src/auth/session.ts', 'x', 'y')))).toContain('as security')
+  })
+
+  test('the dialog locks on the first category a two-category GATE names', async ($, on) => {
+    const { files } = tripWorld(on)
+    await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
+    await append($, reply('Guardrail · GATE · concurrency + data: a double removal', 't12'))
+    await $.tool.call(ask('concurrency', 'Two removals at once: how many rows?'))
+    expect(files.get(LOCK)).toBe('GATE · concurrency · Two removals at once: how many rows?\n')
+  })
+
+  test('a reason on the triage line covers its category alone, and is logged', async ($, on) => {
+    const { files } = tripWorld(on)
+    await start($)
+    await append($, reply('Guardrail · GO · design token rename · not security: `rename`', 't5'))
+    expect((await $.tool.call(change('/proj/src/theme.ts', 'old', 'export const token = 1'))).deny).toBeUndefined()
+    expect(refusal(await $.tool.call(change('/proj/src/theme.ts', 'old', 'await db.transaction(fn)')))).toContain('as data')
+    expect(events(files).find(e => e.e === 'triage')).toMatchObject({ waived: ['security'], why: 'rename' })
+  })
+
+  test('a new file is read whole, and its path counts', async ($, on) => {
+    tripWorld(on)
+    await start($)
+    await append($, reply('Guardrail · CHECK · new to you: SQL migrations', 't6'))
+    const refused = refusal(await $.tool.call({ tool: 'Write', file_path: '/proj/db/migrations/001.sql', content: 'select 1;\n' }))
+    expect(refused).toContain('its path matches (^|/)migrations?/')
+  })
+
+  test('only changed lines count, comments never do, and every edit of a MultiEdit is read', async ($, on) => {
+    tripWorld(on)
+    await start($)
+    await append($, reply('Guardrail · GO · rename a helper', 't7'))
+    expect((await $.tool.call(change('/proj/src/db.ts', 'await db.transaction(a)\nfoo()', 'await db.transaction(a)\nbar()'))).deny).toBeUndefined()
+    expect((await $.tool.call(change('/proj/src/db.ts', 'x', '// refresh the token later'))).deny).toBeUndefined()
+    const multi = { tool: 'MultiEdit', file_path: '/proj/src/db.ts', edits: [{ old_string: 'a', new_string: 'b' }, { old_string: 'c', new_string: 'DELETE FROM runs' }] } as never
+    expect(refusal(await $.tool.call(multi))).toContain('as data')
+  })
+
+  test('a new message needs new triage, unless it answers the open checkpoint', async ($, on) => {
+    tripWorld(on)
+    await start($)
+    await append($, reply('Guardrail · GO · timeout value', 't8'))
+    await $.prompt.submit(prompt('now the retry'))
+    expect(refusal(await $.tool.call(edit('/proj/src/a.ts')))).toContain('triage before building')
+    await append($, reply('Guardrail · GATE · data: one transaction', 't9'))
+    await $.tool.call({ tool: 'Write', file_path: LOCK, content: 'GATE · data · Both writes or neither?\n' })
+    await $.prompt.submit(prompt('both or neither, because it rolls back'))
+    await $.tool.call({ tool: 'Bash', command: 'node lock.mjs close passed' })
+    expect((await $.tool.call(change('/proj/src/db.ts', 'x', 'await db.transaction(fn)'))).deny).toBeUndefined()
+  })
+
+  test('off until the skill is called, and outside the project', async ($, on) => {
+    tripWorld(on)
+    await $.prompt.submit(prompt('add a timeout'))
+    expect((await $.tool.call(change('/proj/src/db.ts', 'x', 'await db.transaction(fn)'))).deny).toBeUndefined()
+    await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
+    expect((await $.tool.call(edit('/tmp/scratch.ts'))).deny).toBeUndefined()
+  })
+
+  test('a slash command or an allowed Skill call turns it on, even where skill.prompt never runs', async ($, on) => {
+    tripWorld(on)
+    await $.prompt.submit({ ...prompt('/learning-guardrails add a timeout'), command: { name: 'learning-guardrails', args: 'add a timeout' } })
+    expect(refusal(await $.tool.call(edit('/proj/src/a.ts')))).toContain('triage before building')
+  })
+
+  test('so does the Skill call, once the message names it', async ($, on) => {
+    tripWorld(on)
+    await $.prompt.submit(prompt('use learning guardrails for this'))
+    expect((await $.tool.call(edit('/proj/src/a.ts'))).deny).toBeUndefined()
+    expect((await $.tool.call({ tool: 'Skill', skill: 'learning-guardrails' } as never)).deny).toBeUndefined()
+    expect(refusal(await $.tool.call(edit('/proj/src/a.ts')))).toContain('triage before building')
+  })
+
+  test('a floor it cannot read fails open: only the triage check holds', async ($, on) => {
+    tripWorld(on, { [FLOOR_FILE]: '{ not json' })
+    await start($)
+    expect(refusal(await $.tool.call(edit('/proj/src/a.ts')))).toContain('triage before building')
+    await append($, reply('Guardrail · GO · tidy', 't10'))
+    expect((await $.tool.call(change('/proj/src/db.ts', 'x', 'await db.transaction(fn)'))).deny).toBeUndefined()
+  })
+
+  test('parsing triage lines, changed lines and the floor', () => {
+    expect(triageLines('Guardrail · GATE · data: indexed lookup · on record')).toMatchObject([{ tier: 'GATE', gated: ['data'], waived: [] }])
+    expect(triageLines('Guardrail · GATE · concurrency + data: a double removal')[0]?.gated).toEqual(['concurrency', 'data'])
+    expect(triageLines('Guardrail · GO · tokens · not security: rename · not data: test-fixture')[0]?.waived).toEqual([
+      { cat: 'security', why: 'rename' },
+      { cat: 'data', why: 'test-fixture' },
+    ])
+    expect(triageLines('Guardrail · GATE · architecture: first global store')[0]?.gated).toEqual([])
+    expect(triageLines('Guardrail · CHECK · new to you: Intl')[0]?.gated).toEqual([])
+    expect(changedLines('a\nb\nb', 'a\nb\nc')).toEqual(['c', 'b'])
+    expect(changedLines('', 'x\n')).toEqual(['x', ''])
+    const floor = compileFloor(JSON.parse(FLOOR))
+    if (floor === null) throw new Error('the test floor should compile')
+    expect(floorSignals(floor, ['src/auth/session.ts'], [{ file: 'src/auth/session.ts', text: 'x = 1' }])).toEqual(['security'])
+    expect(floorSignals(floor, ['notes.md'], [{ file: 'notes.md', text: 'a transaction' }])).toEqual([])
+    expect(compileFloor({ version: 2, packs: [] })).toBeNull()
+    expect(compileFloor('nope')).toBeNull()
   })
 })

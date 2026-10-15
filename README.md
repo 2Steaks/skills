@@ -20,7 +20,7 @@ In Claude Code, add this repo as a marketplace once:
 | Name | Kind | What it does |
 | --- | --- | --- |
 | [learning-guardrails](skills/learning-guardrails) | skill | Opt-in: call it with `/learning-guardrails` and it triages every code change, asking a quick multiple-choice question about anything risky or new. Only high-risk changes wait for your answer. |
-| [learning-gate](plugins/learning-gate) | mod | Enforces learning-guardrails: keeps it opt-in, refuses code edits while a high-risk checkpoint is open and pins the open question above the prompt. |
+| [learning-gate](plugins/learning-gate) | mod | Enforces learning-guardrails: keeps it opt-in, makes Claude triage before editing, refuses an edit the risk rules flag that the triage didn't cover, holds code edits while a high-risk checkpoint is open and pins the open question above the prompt. |
 
 They're built to go together: the skill decides when to stop, the mod makes sure nothing slips past. Several sessions can work in one project without blocking each other, and `/pickup` offers a menu of unfinished checkpoints.
 

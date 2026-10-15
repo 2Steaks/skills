@@ -103,6 +103,10 @@ export function report(events, concepts, { bad = 0, misses = null } = {}) {
   const rank = { go: 0, check: 1, gate: 2 };
   out.push(`- diff reviews: ${reviews.length} · missed risk ${reviews.filter((e) => rank[e.actual] > rank[e.triaged]).length} · over-triage ${reviews.filter((e) => rank[e.actual] < rank[e.triaged]).length}`);
   out.push(`- disputed tiers: ${skill.filter((e) => e.e === "disputed").length}`);
+  const tripped = mod.filter((e) => e.e === "floor_refused");
+  out.push(`- tripwire (mod): ${mod.filter((e) => e.e === "triage_refused").length} edits before any triage · ${tripped.length} flagged by the packs${tripped.length ? ` (${show(tally(tripped.flatMap((e) => e.cats ?? [])))})` : ""}`);
+  const lowered = [...mod.filter((e) => e.e === "triage" && Array.isArray(e.waived)), ...skill.filter((e) => e.e === "triage" && e.why)];
+  out.push(`- rated below the packs, with a reason: ${lowered.length}${lowered.length ? ` (${show(tally(lowered.map((e) => e.why ?? "unstated")))})` : ""}`);
   out.push("");
 
   out.push("## Record drift");

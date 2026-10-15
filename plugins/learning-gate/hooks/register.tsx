@@ -18,19 +18,28 @@
 // .learning/events.jsonl as "by":"mod"; the skill logs the judgement calls.
 // Until the skill is in play this session, its lock is parked, not enforced: the band
 // says so and /pickup resumes it (loading the skill), or picks another from a menu.
+// The tripwire, while the skill is in play: a code edit is refused when no triage line
+// has come since the user's last message, or when the skill's rule packs flag it
+// (.learning/floor.json, which the skill writes each session) and no triage line since
+// then GATEs that category or rates it lower with a reason (`· not data: test-fixture`).
+// An open checkpoint counts as triage. Prose and files the packs ignore always pass.
 // A hook that fails is skipped: the gate fails open, never locking you out.
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { GateLock } from '../types'
+import type { Cover, GateLock } from '../types'
+import { CATS, changedLines, compileFloor, floorMatches } from './floor.mjs'
+import type { Floor, FloorMatch } from './floor.mjs'
 
 type Engine = EngineInterface
 
+const UNCOVERED: Cover = { triaged: false, gated: [], waived: [] }
 const lockState = atom({ plugin: 'learning-gate', key: 'lock' } as const, null)
 const triageState = atom({ plugin: 'learning-gate', key: 'triage' } as const, null)
 const activeState = atom({ plugin: 'learning-gate', key: 'active' } as const, false)
 const namedState = atom({ plugin: 'learning-gate', key: 'named' } as const, false)
 const unfinishedState = atom({ plugin: 'learning-gate', key: 'unfinished' } as const, 0)
+const coverState = atom({ plugin: 'learning-gate', key: 'cover' } as const, UNCOVERED)
 const EDIT_TOOLS = new Set(['Edit', 'MultiEdit', 'Write', 'NotebookEdit'])
 const TRIAGE = /Guardrail · (GO|CHECK|GATE) · ([^\n`]+)/g
 const SKILL = 'learning-guardrails'
@@ -45,6 +54,7 @@ const RULES = {
     'The learning-gate plugin is installed. It enforces the checkpoints the learning-guardrails skill opens, and nothing else.',
     'The learning-guardrails skill is opt-in: load it only when the user runs /learning-guardrails or names it in their latest message. Never load it on your own, even for coding tasks.',
     "While this session's lock (.learning/locks/<session id>.lock) exists, the plugin refuses code edits and pins the open question above the prompt. Other sessions' locks never hold this one. Close a checkpoint only as the skill allows, and never offer the user a way around one.",
+    "While the skill is in play, it also refuses a code edit made before any triage line since the user's last message, or one the skill's rule packs flag that no triage line since then GATEs or gives a reason for (`· not <category>: <reason-code>`). Write the line, then edit again. Judge the change, not the words: never GATE just to get past it.",
     "The plugin replaces the skill's hook script: do not install learning-gate.mjs.",
   ].join('\n'),
 } as const
@@ -67,6 +77,8 @@ export const register: Register = on => {
   })
 
   // Opt-in: the skill is in play once its prompt is expanded (/name, or an allowed Skill call).
+  // Where an organization manages Claude Code this hook never runs for an installed plugin,
+  // so prompt.submit (the slash command) and tool.call (the Skill call) turn it on as well.
   on('skill.prompt', async ($, e, next) => {
     if (isThisSkill(e.skill)) await update($, activeState, () => true)
 
@@ -106,10 +118,18 @@ export const register: Register = on => {
 
           return { deny: blockMessage(lock) }
         }
+        // The tripwire: triage before building, and nothing the rule packs flag slips past it.
+        const refused = file === undefined ? null : await tripwire($, e, tool, file)
+        if (refused !== null) {
+          await logEvent($, refused.event)
+
+          return { deny: refused.message }
+        }
       }
     }
 
     const ran = await next(e)
+    if (tool === 'Skill' && isThisSkill((e as { skill?: unknown }).skill) && ran.deny === undefined) await update($, activeState, () => true)
     if (touchesRecord) {
       const target = editTarget(e)
       if (target !== undefined) await keepPrivate($, resolvePath(await $.session.cwd(), target))
@@ -124,7 +144,10 @@ export const register: Register = on => {
   on('prompt.submit', async ($, e, next) => {
     const named = NAMES_SKILL.test(e.text)
     await update($, namedState, () => named)
+    if (isThisSkill(e.command?.name)) await update($, activeState, () => true)
     const lock = await refresh($)
+    // A new message starts new work, to triage before building. An answer to the open checkpoint doesn't.
+    if (lock === null || !(await read($, activeState))) await uncover($)
     // Parked checkpoints stay quiet until the user opts back in.
     if (lock === null || !(named || (await read($, activeState)))) return next(e)
     const note =
@@ -152,9 +175,12 @@ export const register: Register = on => {
         await update($, triageState, () => last)
         showStatus($, await read($, lockState), last, await read($, activeState))
       }
-      for (const [, tier, what] of found) {
-        await logEvent($, { e: 'triage', tier: (tier ?? '').toLowerCase(), what: (what ?? '').trim().slice(0, 80) })
+      const triaged = triageLines(text)
+      for (const t of triaged) {
+        const lowered = t.waived.length > 0 ? { waived: t.waived.map(w => w.cat), why: t.waived[0]?.why } : {}
+        await logEvent($, { e: 'triage', tier: t.tier.toLowerCase(), what: t.what.slice(0, 80), ...lowered })
       }
+      if (triaged.length > 0) await cover($, triaged)
       const asked = (await read($, activeState)) ? askedCheckpoint(text, await read($, triageState)) : null
       if (asked !== null) await lockIfOpen($, asked)
     }
@@ -307,7 +333,9 @@ async function setLock($: Engine, lock: GateLock | null): Promise<void> {
     if (before !== null && lock === null) $.ui.toast('Gate lifted. Carry on.')
   }
   await trackGate($, lock)
-  showStatus($, lock, await read($, triageState), await read($, activeState))
+  const active = await read($, activeState)
+  if (lock !== null && active) await coverLock($, lock)
+  showStatus($, lock, await read($, triageState), active)
 }
 
 // Which gates are open, by lock path, kept across sessions: a lock seen again
@@ -391,9 +419,14 @@ const MOVE = /👉\s*(?:\*\*)?Your move(?::\*\*|\*\*:|:)\s*(.+)/g
 // The last triage line's category, when it was a GATE: only a GATE locks.
 function gateCategory(triage: string | null): string | null {
   const triaged = triage === null ? null : /Guardrail · (GO|CHECK|GATE) · ([^:\n]+)/.exec(triage)
+  if (triaged?.[1] !== 'GATE') return null
+  const label = triaged[2]?.trim() ?? ''
 
-  return triaged?.[1] === 'GATE' ? (triaged[2]?.trim() ?? '') : null
+  return label.split(JOIN)[0]?.trim() || label
 }
+
+// Between the categories a GATE line names: `concurrency + data: a double removal`.
+const JOIN = /\s*(?:\+|,|&|\/|\band\b)\s*/
 
 // The last `👉 Your move:` question in a reply after a GATE triage line, labelled
 // from the checkpoint header or that line. A CHECK question never locks.
@@ -428,6 +461,144 @@ async function lockIfOpen($: Engine, asked: Asked): Promise<void> {
   } catch {
     // the skill still holds the line if this fails
   }
+}
+
+// ---- the tripwire ----
+
+type Triaged = { tier: string; what: string; gated: readonly string[]; waived: readonly { cat: string; why: string }[] }
+
+const WAIVER = /·\s*not\s+(data|concurrency|security|performance|state|contracts)\s*:\s*([a-z0-9][a-z0-9-]*)/gi
+
+// Each triage line in a reply: the categories a GATE covers (one, or two joined: `concurrency +
+// data: …`), and each one rated lower with a reason (`Guardrail · GO · token rename · not security: rename`).
+export function triageLines(text: string): Triaged[] {
+  return [...text.matchAll(TRIAGE)].map(m => {
+    const tier = m[1] ?? ''
+    const what = (m[2] ?? '').trim()
+    const at = m.index ?? 0
+    const end = text.indexOf('\n', at)
+    const line = text.slice(at, end < 0 ? undefined : end).replace(/`/g, '')
+    const cats = (what.split(':')[0] ?? '').split(JOIN).map(c => c.trim().toLowerCase())
+    const waived = [...line.matchAll(WAIVER)].map(w => ({ cat: (w[1] ?? '').toLowerCase(), why: (w[2] ?? '').toLowerCase() }))
+
+    return { tier, what, gated: tier === 'GATE' ? cats.filter(c => CATS.includes(c)) : [], waived }
+  })
+}
+
+async function cover($: Engine, lines: readonly Triaged[]): Promise<void> {
+  await update($, coverState, c => ({
+    triaged: true,
+    gated: [...new Set([...c.gated, ...lines.flatMap(t => t.gated)])],
+    waived: [...new Set([...c.waived, ...lines.flatMap(t => t.waived.map(w => w.cat))])],
+  }))
+}
+
+// An open checkpoint is triage: its category stays covered once it closes, until the next message.
+async function coverLock($: Engine, lock: GateLock): Promise<void> {
+  const cat = lock.category.trim().toLowerCase()
+  const known = CATS.includes(cat)
+  const c = await read($, coverState)
+  if (c.triaged && (!known || c.gated.includes(cat))) return
+  await update($, coverState, now => ({ ...now, triaged: true, gated: known && !now.gated.includes(cat) ? [...now.gated, cat] : now.gated }))
+}
+
+async function uncover($: Engine): Promise<void> {
+  const c = await read($, coverState)
+  if (c.triaged || c.gated.length > 0 || c.waived.length > 0) await update($, coverState, () => UNCOVERED)
+}
+
+const PROSE = /\.(md|mdx|markdown|rst|adoc|txt)$/i
+
+const TRIAGE_FIRST = [
+  "Learning guardrails: triage before building. No triage line has come since the user's last message.",
+  'Write it first (`Guardrail · GO|CHECK|GATE · <label>`, learning-guardrails §1), then make the edit.',
+].join('\n')
+
+type Refusal = { message: string; event: Record<string, unknown> }
+
+// Null lets the edit through. Anything unexpected fails open, like the gate.
+async function tripwire($: Engine, e: unknown, tool: string, file: string): Promise<Refusal | null> {
+  try {
+    const record = await projectRecord($)
+    if (record === null) return null // not set up here: nothing to check against
+    const rel = relativeTo(parentOf(record), file)
+    if (rel === null) return null // outside this project
+    const floor = await loadFloor($, join(record, 'floor.json'))
+    if (floor === null ? PROSE.test(rel) : floor.ignore.some(re => re.test(rel))) return null // not building
+    const covered = await read($, coverState)
+    if (!covered.triaged) return { message: TRIAGE_FIRST, event: { e: 'triage_refused', tool } }
+    if (floor === null) return null
+    const lines = await editedLines($, e, file)
+    const found = floorMatches(floor, [rel], lines.map(text => ({ file: rel, text })))
+    const missing = CATS.filter(cat => found.some(m => m.cat === cat) && !covered.gated.includes(cat) && !covered.waived.includes(cat))
+    if (missing.length === 0) return null
+
+    return { message: floorMessage(rel, missing, found), event: { e: 'floor_refused', cats: missing, tool } }
+  } catch {
+    return null
+  }
+}
+
+function relativeTo(root: string, file: string): string | null {
+  const path = clean(file)
+  const prefix = root === '/' ? '/' : `${root}/`
+
+  return path.startsWith(prefix) ? path.slice(prefix.length) : null
+}
+
+// The lines this edit adds or removes, whichever tool makes it.
+async function editedLines($: Engine, e: unknown, file: string): Promise<string[]> {
+  const input = e as { old_string?: unknown; new_string?: unknown; content?: unknown; edits?: unknown; new_source?: unknown }
+  const str = (v: unknown) => (typeof v === 'string' ? v : '')
+  if (Array.isArray(input.edits)) {
+    return input.edits.flatMap((one: { old_string?: unknown; new_string?: unknown } | null) => changedLines(str(one?.old_string), str(one?.new_string)))
+  }
+  if (typeof input.content === 'string') {
+    let before = ''
+    try {
+      if (await $.fs.exists(file)) before = await $.fs.read(file)
+    } catch {
+      before = '' // unreadable: every line counts
+    }
+    return changedLines(before, input.content)
+  }
+  if (typeof input.new_source === 'string') return changedLines('', input.new_source)
+
+  return changedLines(str(input.old_string), str(input.new_string))
+}
+
+let floorCache: { text: string; floor: Floor | null } | undefined
+
+async function loadFloor($: Engine, path: string): Promise<Floor | null> {
+  if (!(await $.fs.exists(path))) return null
+  const text = await $.fs.read(path)
+  if (floorCache === undefined || floorCache.text !== text) {
+    let raw: unknown = null
+    try {
+      raw = JSON.parse(text)
+    } catch {
+      raw = null
+    }
+    floorCache = { text, floor: compileFloor(raw) }
+  }
+
+  return floorCache.floor
+}
+
+function floorMessage(rel: string, cats: readonly string[], found: readonly FloorMatch[]): string {
+  const why = cats.map(cat => {
+    const hits = found.filter(m => m.cat === cat)
+    const shown = [...new Set(hits.map(m => (m.text === undefined ? `its path matches ${m.pattern.replace(/\\\//g, '/')}` : `"${m.text.trim().slice(0, 60)}"`)))]
+
+    return `${cat} (${shown.slice(0, 2).join('; ')})`
+  })
+  const first = cats[0] ?? 'data'
+
+  return [
+    `Learning guardrails: the rule packs flag this edit to ${rel} as ${why.join(', ')}, and no triage line since the user's last message covers ${cats.length === 1 ? 'it' : 'them'}.`,
+    `Judge the change, not the words. If it changes how that behaves, it's a GATE: \`Guardrail · GATE · ${first}: <label>\`, then the checkpoint the skill asks for.`,
+    `If it doesn't, add the reason to your triage line, one per category: \`· not ${first}: <reason-code>\` (non-functional-edit, test-fixture, rename…). Then edit again.`,
+  ].join('\n')
 }
 
 // ---- the log ----

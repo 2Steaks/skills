@@ -9,17 +9,21 @@
 // A layer ("version": 2) adds patterns and removes them by exact string, `ignore` included. A rules
 // file without "version": 2 is an old full copy: it replaces everything below it.
 // Deterministic: no network, randomness or AI. The engagement judgement stays with Claude.
+// Usage: node rules.mjs floor    writes the rules in force to .learning/floor.json, for the learning-gate mod
+//        node rules.mjs check    what the rules flag in the work not yet committed
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { CATS, fail, home, projectRoot } from "./lib.mjs";
+import { CATS, fail, home, isMain, projectRoot } from "./lib.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const PACKS = path.join(HERE, "..", "assets", "rules");
 const KINDS = ["paths", "diff", "diffExact"];
 
 // Blank, or a comment in most languages. `#[` is a Rust or PHP attribute and `*p` a dereference: code.
-export const isComment = (line) => /^\s*$|^\s*(\/\/|\/\*|\*(\s|\/|$)|#(?!!?\[)|<!--)/.test(line);
+const COMMENT = /^\s*$|^\s*(\/\/|\/\*|\*(\s|\/|$)|#(?!!?\[)|<!--)/;
+export const isComment = (line) => COMMENT.test(line);
 
 function readJson(file) {
   let text;
@@ -201,4 +205,108 @@ export function parseDiff(text) {
 export function describe(rules, root = projectRoot()) {
   const short = (f) => (f === PACKS ? `assets/rules (${readPacks(f).length} packs)` : f.replace(root, ".").replace(home(), "~"));
   return rules.sources.map(short).join(" + ");
+}
+
+// ---- the floor, for the learning-gate mod ----
+
+// The rules in force as plain JSON. The mod checks each edit against them before it lands, with
+// its own copy of matches() (plugins/learning-gate/hooks/floor.mjs), held to this one by the tests.
+export function floorOf(rules, root = projectRoot()) {
+  const src = (list) => list.map((re) => re.source);
+  return {
+    version: 1,
+    sources: describe(rules, root),
+    commentOnly: rules.commentOnly !== false,
+    comment: COMMENT.source,
+    ignore: src(rules.ignore),
+    packs: rules.packs.map((p) => ({
+      name: p.name,
+      files: p.scope === null ? null : src(p.scope),
+      categories: Object.fromEntries(CATS.map((cat) => {
+        const { paths, diff } = p.categories[cat];
+        return [cat, { paths: src(paths), diff: src(diff.filter((re) => re.flags.includes("i"))), diffExact: src(diff.filter((re) => !re.flags.includes("i"))) }];
+      })),
+    })),
+  };
+}
+
+export const floorPath = (root) => path.join(root, ".learning", "floor.json");
+
+export function writeFloor(root = projectRoot()) {
+  const floor = floorOf(loadRules({ root }), root);
+  fs.mkdirSync(path.dirname(floorPath(root)), { recursive: true });
+  fs.writeFileSync(floorPath(root), `${JSON.stringify(floor)}\n`);
+  return floor;
+}
+
+// ---- check: the work not yet committed ----
+
+const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
+// Tracked changes against HEAD (the empty tree before the first commit), plus new files. Null outside git.
+export function workingChanges(root) {
+  const git = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
+  let base;
+  try {
+    git("rev-parse", "--is-inside-work-tree");
+    base = (() => {
+      try {
+        git("rev-parse", "--verify", "-q", "HEAD");
+        return "HEAD";
+      } catch {
+        return EMPTY_TREE;
+      }
+    })();
+  } catch {
+    return null;
+  }
+  const { files, lines } = parseDiff(git("diff", base, "--unified=0", "--no-color", "--src-prefix=a/", "--dst-prefix=b/"));
+  for (const file of git("ls-files", "--others", "--exclude-standard", "-z").split("\0").filter(Boolean)) {
+    const full = path.join(root, file);
+    let text;
+    try {
+      if (fs.statSync(full).size > 1024 * 1024) continue;
+      text = fs.readFileSync(full, "utf8");
+    } catch {
+      continue;
+    }
+    if (text.includes("\0")) continue; // binary
+    files.push(file);
+    for (const line of text.split("\n")) lines.push({ file, text: line });
+  }
+  return { files, lines };
+}
+
+// Each flagged category with up to three examples: the file and the line, or the path pattern.
+export function flagged(found) {
+  const out = [];
+  for (const cat of CATS) {
+    const hits = found.filter((m) => m.cat === cat);
+    if (hits.length === 0) continue;
+    const seen = new Set();
+    const shown = [];
+    for (const m of hits) {
+      const what = m.text === undefined ? `${m.file} (path)` : `${m.file ?? "?"} "${m.text.trim().slice(0, 60)}"`;
+      if (!seen.has(what) && shown.length < 3) shown.push(what);
+      seen.add(what);
+    }
+    out.push(`- ${cat}: ${shown.join(" · ")}${seen.size > shown.length ? ` · +${seen.size - shown.length} more` : ""}`);
+  }
+  return out;
+}
+
+if (isMain(import.meta.url)) {
+  const [cmd] = process.argv.slice(2);
+  const root = projectRoot();
+  if (cmd === "floor") {
+    const floor = writeFloor(root);
+    console.log(`floor: ${path.relative(root, floorPath(root))} (${floor.sources})`);
+  } else if (cmd === "check") {
+    const changes = workingChanges(root);
+    if (changes === null) fail("check reads git: this isn't a git repo.");
+    const lines = flagged(matches(changes.files, changes.lines, loadRules({ root })));
+    console.log(lines.length ? `The packs flag (review, not a verdict):\n${lines.join("\n")}` : "The packs flag nothing in the uncommitted work.");
+  } else {
+    fail("usage: rules.mjs floor | check");
+  }
 }

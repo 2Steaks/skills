@@ -1,10 +1,12 @@
 #!/usr/bin/env node
-// setup.mjs: the first run in a project. Creates the record and keeps it out of git
-// (the repo's own .git/info/exclude, never the team's .gitignore). Safe to run any time.
+// setup.mjs: run at the start of every session. The first time in a project it creates the record and
+// keeps it out of git (the repo's own .git/info/exclude, never the team's .gitignore); every time, it
+// writes the rules in force to .learning/floor.json, which the learning-gate mod checks edits against.
 // Usage: node setup.mjs [--gate mod|hook|declined]
 import fs from "node:fs";
 import path from "node:path";
 import { excludeFile, fail, generalDir, home, isMain, learningDir, locksDir, parseArgs, projectDir, projectRoot } from "./lib.mjs";
+import { floorPath, writeFloor } from "./rules.mjs";
 
 const SESSION = `## Parked
 ## Setup
@@ -59,4 +61,6 @@ if (isMain(import.meta.url)) {
   const shown = (p) => (p.startsWith(root + path.sep) ? path.relative(root, p) : p.startsWith(home() + path.sep) ? `~/${path.relative(home(), p)}` : p);
   console.log(`record: ${created.length > 0 ? `created ${created.map(shown).join(", ")}` : "already set up"}`);
   console.log(`git: ${git}`);
+  const floor = writeFloor(root);
+  console.log(`floor: ${shown(floorPath(root))} (${floor.sources})`);
 }
