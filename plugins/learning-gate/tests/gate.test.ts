@@ -528,7 +528,14 @@ describe('/learned', () => {
     expect(text).toContain('2 concepts')
     expect(text).toContain('Demonstrated (1): idempotency')
     expect(text).toContain('Learning (1): run-start')
-    expect(text).toContain('Open gaps: 1')
+    expect(text).not.toMatch(/gap/i)
+  })
+
+  test('shows needs-reinforcement as worth a refresh', async ($, on) => {
+    world(on, { [GENERAL]: '---\nconcept: idempotency\nstatus: needs-reinforcement\n---\n## Known gaps\n- one\n' })
+    const { text } = await $.command.run(command('learned'))
+    expect(text).toContain('Worth a refresh (1): idempotency')
+    expect(text).not.toMatch(/gap|reinforcement/i)
   })
 
   test('says so when nothing is recorded', async ($, on) => {

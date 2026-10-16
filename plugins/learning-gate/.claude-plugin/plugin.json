@@ -1,6 +1,6 @@
 {
   "name": "learning-gate",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Enforces the opt-in learning-guardrails skill: keeps Claude from loading it unasked, refuses code edits before triage or when the risk rules flag an edit the triage didn't cover, blocks code edits while a checkpoint is open (one left from an earlier session waits, parked, for /pickup), pins the open question above the prompt, adds /learned, /pickup and /audit.",
   "types": "./types/index.d.ts",
   "author": {

@@ -81,6 +81,16 @@ test("lock opens with the exact line, setting up the record first", () => {
   assert.match(w.read(".learning/locks/s1.lock"), /^task: Make claimSlot safe$/m);
 });
 
+test("lock refuses a question over 25 words, and takes one of 25", () => {
+  const w = world();
+  const long = "Two removals of the same guest arrive 50ms apart. Each one first looks for an existing removal, finds none, then saves one. How many removal rows end up saved?";
+  const r = w.run("lock.mjs", ["open", "GATE", "concurrency", long, "--task", "Safe removal"]);
+  assert.match(r.err, /question is 29 words\. Questions are ≤25/);
+  assert.equal(w.exists(".learning/locks/s1.lock"), false);
+  const ok = Array.from({ length: 25 }, (_, i) => `w${i}`).join(" ");
+  assert.equal(w.run("lock.mjs", ["open", "GATE", "concurrency", ok, "--task", "Safe removal"]).code, 0);
+});
+
 test("lock refuses GO, a CHECK, a bad label, a missing question and a missing task", () => {
   const w = world();
   assert.match(w.run("lock.mjs", ["open", "GO", "x", "Why?"]).err, /GO never locks/);
@@ -234,10 +244,13 @@ test("record handles gaps, project files, find and summary", () => {
   assert.match(w.run("record.mjs", ["find", "idempotency"]).out, /^idempotency · general · demonstrated · gaps 1/);
   assert.equal(
     w.run("record.mjs", ["summary"]).out,
-    "Learning record: 2 concepts\nDemonstrated (1): idempotency\nLearning (1): run-start-dedupe\nOpen gaps: 1",
+    "Learning record: 2 concepts\nDemonstrated (1): idempotency\nLearning (1): run-start-dedupe",
   );
   assert.match(w.run("record.mjs", ["update", "idempotency", "--close-gap", "across services"]).out, /closed gap/);
-  assert.doesNotMatch(w.run("record.mjs", ["summary"]).out, /Open gaps/);
+  w.run("record.mjs", ["update", "run-start-dedupe", "--project", "--status", "needs-reinforcement"]);
+  const out = w.run("record.mjs", ["summary"]).out;
+  assert.match(out, /^Worth a refresh \(1\): run-start-dedupe$/m);
+  assert.doesNotMatch(out, /gap|reinforcement/i);
 });
 
 // ---- log ----

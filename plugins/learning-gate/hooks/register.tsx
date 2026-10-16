@@ -664,7 +664,7 @@ type Concept = { name: string; status: string; gaps: number }
 const GROUPS: readonly (readonly [string, string])[] = [
   ['demonstrated', 'Demonstrated'],
   ['learning', 'Learning'],
-  ['needs-reinforcement', 'Needs reinforcement'],
+  ['needs-reinforcement', 'Worth a refresh'],
   ['unfamiliar', 'Unfamiliar'],
 ]
 
@@ -713,8 +713,7 @@ export function summarise(concepts: readonly Concept[]): string {
   }
   const other = concepts.filter(c => !known.has(c.status))
   if (other.length > 0) lines.push(`Other (${other.length}): ${names(other)}`)
-  const gaps = concepts.reduce((sum, c) => sum + c.gaps, 0)
-  if (gaps > 0) lines.push(`Open gaps: ${gaps}`)
+  // No gap count: gaps are notes for when a concept comes up again, not a to-do list.
 
   return lines.join('\n')
 }
