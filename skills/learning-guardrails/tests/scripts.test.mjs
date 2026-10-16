@@ -244,10 +244,13 @@ test("record handles gaps, project files, find and summary", () => {
   assert.match(w.run("record.mjs", ["find", "idempotency"]).out, /^idempotency · general · demonstrated · gaps 1/);
   assert.equal(
     w.run("record.mjs", ["summary"]).out,
-    "Learning record: 2 concepts\nDemonstrated (1): idempotency\nLearning (1): run-start-dedupe\nOpen gaps: 1",
+    "Learning record: 2 concepts\nDemonstrated (1): idempotency\nLearning (1): run-start-dedupe",
   );
   assert.match(w.run("record.mjs", ["update", "idempotency", "--close-gap", "across services"]).out, /closed gap/);
-  assert.doesNotMatch(w.run("record.mjs", ["summary"]).out, /Open gaps/);
+  w.run("record.mjs", ["update", "run-start-dedupe", "--project", "--status", "needs-reinforcement"]);
+  const out = w.run("record.mjs", ["summary"]).out;
+  assert.match(out, /^Worth a refresh \(1\): run-start-dedupe$/m);
+  assert.doesNotMatch(out, /gap|reinforcement/i);
 });
 
 // ---- log ----
