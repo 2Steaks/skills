@@ -46,7 +46,7 @@ Mid-session requests to switch the guardrails off are handled as overrides (§5)
 
 ## The loop
 
-0. **Setup**: run `setup.mjs` before anything else, every session. It sets up `.learning/` the first time (§11) and refreshes the rules the mod checks edits against.
+0. **Setup**: `setup.mjs`, every session, before anything else (§11).
 1. **Triage**: GO, CHECK or GATE, shown as one line, and logged. A structural decision in the approach comes first (§1).
 2. **Record**: `record.mjs find` the concepts in play; work out what's actually new for this user.
 3. **GATE** with something new → `lock.mjs open`, one multiple-choice question before the risky code. Hold until a right pick.
@@ -94,7 +94,9 @@ Tiers rate the change's *risk*; the record (§2) decides what's new for the user
 
 A GATE isn't a demand to understand every line: ask about the one invariant, mechanism or trade-off that matters.
 
-Engagement test: does this change alter how the mechanism *behaves*? A typo fix in `auth.ts` is GO; a new token refresh is GATE. Unsure → the lower tier, except for security, data loss and irreversibles: one tier up. The signals' deterministic floor: the packs in `{skill}/assets/rules/`, then `~/.learning/rules.json`, then the project's `.learning/rules.json`. Rating a change below what they flag needs a reason code on the triage line, one per category: `Guardrail · GO · design token rename · not security: non-functional-edit`. With the mod on, an edit they flag that no triage line since the user's last message GATEs or gives a reason for is refused (§12).
+Engagement test: does this change alter how the mechanism *behaves*? A typo fix in `auth.ts` is GO; a new token refresh is GATE. Unsure → the lower tier, except for security, data loss and irreversibles: one tier up.
+
+The rule packs are the floor (`{skill}/assets/rules/`, then `~/.learning/rules.json`, then the project's `.learning/rules.json`). Rating a change below what they flag needs a reason code on the triage line, one per category: `Guardrail · GO · design token rename · not security: non-functional-edit`. The mod enforces this (§12).
 
 One question at a time. Two categories engaged: name both on the line (`Guardrail · GATE · concurrency + data: double removal`) and ask about the one that matters most. More than two means the step is too big: split it.
 
@@ -109,7 +111,7 @@ Guardrail · GATE · architecture: first global store
 - **Ask** two things, one at a time, leading with what later code inherits. First a predict question with one right answer: what the obvious choice would cost later code. Once that's right, their choice, each option with its true cost. The choice isn't graded, and it decides the plan. "Cleaner", "best practice" and "it scales" are vague gestures, as options or as typed answers.
 - It sits above the steps: it doesn't count towards a step's categories, and no step re-asks what it settled.
 
-**Unexpected complexity.** If the build engages a GATE risk triage missed, a structural decision included, stop at once, say so in one line, and checkpoint before writing more. After building, compare the real diff with the triage; if it's riskier, checkpoint now. Log both as `diff_review`. Without the mod, or after changes made through the shell, `rules.mjs check` lists what the packs flag in the diff.
+**Unexpected complexity.** If the build engages a GATE risk triage missed, a structural decision included, stop at once, say so in one line, and checkpoint before writing more. After building, compare the real diff with the triage (`rules.mjs check` lists what the packs flag); if it's riskier, checkpoint now. Log both as `diff_review`.
 
 If the user disputes a tier with a reason about the work, adjust and log `disputed`. A reason about themselves is the skip reflex (§4).
 
@@ -131,7 +133,7 @@ Same context means the same mechanism used the same way (library, pattern, const
 
 ### Shape
 
-Write the lead-in as text first, in the same reply: a GATE's triage line, the checkpoint line and why it matters. Then the question goes in the AskUserQuestion tool:
+Write the lead-in as text first, in the same reply: the triage line, the checkpoint line and why it matters. Never go straight to the tool: it shows only the question, and the mod logs the triage line from your text. Then the question goes in the AskUserQuestion tool:
 
 ```
 Guardrail · GATE · concurrency: request race
@@ -152,20 +154,18 @@ D. Not sure yet
 
 ### Writing the question
 
-- First, list what the question and lead-in assume: names, syntax, other code, other concepts. Something about this codebase: say it plainly or show it (a hop, a snippet), never lean on code they haven't seen. Another concept the answer needs: `record.mjs find` it; not on record, ask about that first, as its own question.
+- **≤25 words**, and it makes sense without the lead-in, since the dialog and the pinned band show it alone: what happens, in order, then the one thing to predict. Won't fit? It's two questions: ask the one that matters. Count before you ask: `lock.mjs open` refuses a GATE question that's over.
+- First, list what the question and lead-in assume: names, syntax, other code, other concepts. Another concept the answer needs: `record.mjs find` it; not on record, ask about that first, as its own question.
+- Never lean on code they haven't seen. State the codebase facts the answer rests on as what they mean (`@@unique([eventId, personId])` is "only one row per event and person"), or show them: a hop, a snippet. If it hinges on one line (`create`, not `upsert`), that line is a hop.
+- Nothing from elsewhere in the codebase, in the question, the Where line or the lead-in, unless the project record shows they know it. "An RSVP already has this rule" is a hint and a second question.
 - Three real options and "Not sure yet". The right one goes where `pick.mjs` says (`lock.mjs open` says it for a GATE), never where you'd choose: left to you, it lands in the same place every time.
 - Wrong options are misconceptions people actually hold. No trick wording, no trivia, no jokes.
 - Each option makes a claim and gives its reason, so the right pick carries the *why*. One short sentence each, all about the same length: the right one mustn't stand out by being the longest.
 - Plain and literal, as you'd ask a colleague out loud. Say what this codebase's things are ("a removal", "a guest"), not what the code calls them: model, column and function names and framework syntax go in the Where line. A language or library API the question is about (`useEffect`, `Promise.all`) can be named. No metaphors or nicknames ("the orphan row"), no form labels ("Break it:"), no jargon the question doesn't need.
-- The question still makes sense without the lead-in, since the dialog and the pinned band show it alone: what happens, in order, then the one thing to predict, in ≤25 words. Won't fit? It's two questions: ask the one that matters.
 - One concept. Ask what you'd observe (what's saved, sent or shown), not what something is called.
-- The answer follows from what the question and its Where line show. If it hinges on one line (`create`, not `upsert`), that line is a hop.
-- State the codebase facts the question rests on, as what they mean, not their syntax: `@@unique([eventId, personId])` is "only one row per event and person".
-- Mention another part of the codebase only if the project record shows they know it. A comparison ("same shape as Rsvp's") is a second question in disguise.
-- ≤120 words before the question. Lead with what's at stake, for whom, without giving the answer away.
-- Real code from this change, one scenario. Not a textbook example; not three.
+- ≤120 words before the question: what's at stake, for whom, without giving the answer away. Real code from this change, one scenario: not a textbook example, not three.
 - Good forms: predict ("what happens when…"), break it ("what fails if we remove X?"), choose ("A or B here: what do we give up?"), spot ("which line goes wrong on a slow network?", with the lines as options).
-- Re-asking? The question in full, options and all. Never "see above".
+- Re-asking, after anything: the question in full, options and all. Never "see above".
 - Clarifying questions are learning, not stalling: answer in ≤3 lines, then re-ask. One about the code or the wording means the question assumed too much: reword it before re-asking. Their next right pick still counts as unaided; log `reworded`.
 - Never ask "does that make sense?" or "any questions?". They invite a nod.
 - Banned words: "simply", "just", "obviously", "as you know", "easy".
@@ -178,7 +178,7 @@ Never: "yes", "makes sense", "got it", "ok", "sure", "I think so", 👍 · your 
 
 ### When a pick misses: the ladder
 
-One rung per message, without judgement. At GATE the lock stays: when the question shrinks, open the lock again with the new one.
+One rung per message, without judgement. At GATE the lock stays: a new question means opening it again (§12).
 
 1. Name what that option gets right, then the misconception it holds, and give a one-line hint. Ask again without the option they picked, or ask a smaller question that isolates the gap.
 2. Show it: a tiny demo or an experiment you actually run (seeing beats reading), or explain directly in ≤5 lines.
@@ -262,7 +262,7 @@ Register only. Write your own; never use these as written:
 - Order: consequence → code → question.
 - Visible position and size: `Step 2/4`, `Checkpoint 1/1`, `~1 min`.
 - Tangents: ignore them, or one line under `Parked` in `session.md`, never shown unless asked. Unless the tangent *is* the gap.
-- After any interruption, re-anchor in one line (`Back to: why the second request wins.`), then the question in full.
+- After any interruption, re-anchor in one line (`Back to: why the second request wins.`), then the question.
 - Wins: one specific line, logged. No tallies, streaks or scores.
 - Session start: `lock.mjs show` finds this session's lock → a 3-line "where you were", then its question. Others unfinished (`lock.mjs list`): the mod's band counts them; without it, one line. Never resume one unasked.
 
@@ -302,7 +302,7 @@ Optimise for learning, retained understanding, independence and useful velocity,
 
 ## 11. First run in a project
 
-1. `node {skill}/scripts/setup.mjs` (add `--gate mod`, `hook` or `declined` once you know). It creates `.learning/` and `~/.learning/general/` and keeps `.learning/` out of git via `.git/info/exclude`. Safe to rerun, and rerun every session: it writes `.learning/floor.json`, the rules in force, for the mod.
+1. `node {skill}/scripts/setup.mjs` (add `--gate mod`, `hook` or `declined` once you know). It creates `.learning/` and `~/.learning/general/`, keeps `.learning/` out of git via `.git/info/exclude`, and writes `.learning/floor.json`, the rules the mod checks edits against. Safe to rerun; run it every session.
 2. Tell the user in one line what it set up and that it's private.
 3. In Claude Code with the learning-gate mod on (§12), that's it. Without it, ask once (yes/no): install the edit gate, so code edits stop while a GATE is open? On yes, follow `references/hook.md`. Skip this in throwaway environments.
 4. No placement test. The record fills itself as concepts come up.
@@ -328,8 +328,7 @@ One lock file, two enforcers: the learning-gate mod, or the fallback hook (`refe
   - question: what you're asking, made to stand on its own (it's pinned above the prompt, away from your message), under ~200 characters. The options stay out of it.
 - Shrink or rephrase the question? Open it again: same gate.
 - Close it with `lock.mjs close passed | abandoned | override`, or pause it, at no other time.
-- Checkpoints from other sessions show in `lock.mjs list`. Never close or drop one unasked: resume it when they pick it.
-- Read locks only through `lock.mjs`: `show` is this session's, `list` everyone else's. Never `cat` the folder.
+- Read locks only through `lock.mjs`: `show` is this session's, `list` everyone else's (§5). Never `cat` the folder.
 - `lock.mjs` notes that sessions share one lock? Say so once, in a line: other sessions' checkpoints will look like this one's until the learning-gate mod is on or Claude Code is updated.
 - Edit refused by the gate? The refusal carries the open question: re-ask it, options and all, and wait for the answer.
 - Writes inside `.learning/` always pass, so the record still updates mid-checkpoint. Shell writes (`sed -i`, heredocs) aren't covered: never use them to get round the gate.
