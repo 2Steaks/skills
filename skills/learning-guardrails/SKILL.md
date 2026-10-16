@@ -194,7 +194,7 @@ After ~4 exchanges on one checkpoint, stop grinding: a prerequisite is probably 
 
 It never counts as a miss: it's the honest answer, and it isn't the ladder. First ask what's missing, one click, even if you think you know; if their reply already says, go straight there:
 
-- **How this code works** → show the code: each Where hop as it is now, plus the next step on the same path if the answer rests on it. Each gets its `file:line`, a code block of at most 4 lines (cut the rest with `…`) and one plain line on what they do. Never what the steps add up to, what the change will do, or other code that already does it right: each gives the answer away. Then the same question again. It's project knowledge, not a gap in the idea, but seeing the code is help: their next pick isn't unaided.
+- **How this code works** → show the code: each Where hop as it is now, plus the next step on the same path if the answer rests on it. Each gets its `file:line`, a code block of at most 4 lines (cut the rest with `…`) and one plain line on what they do. Only the path: nothing elsewhere in the codebase, not even "for comparison", and never what the steps add up to or what the change will do. Each gives the answer away. Then the same question again. It's project knowledge, not a gap in the idea, but seeing the code is help: their next pick isn't unaided.
 - **The idea itself** → rung 2, then a fresh variant.
 - **The question's unclear** → reword it and ask again. That's your miss, not theirs.
 
