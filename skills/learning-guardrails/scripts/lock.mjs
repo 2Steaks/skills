@@ -40,6 +40,8 @@ function writeLock(file, line, fields) {
 }
 
 const oneLine = (v) => String(v ?? "").replace(/\s+/g, " ").trim();
+export const MAX_WORDS = 25;
+export const wordCount = (text) => oneLine(text).split(" ").filter((w) => /\w/.test(w)).length;
 
 function branch(root) {
   try {
@@ -60,6 +62,8 @@ export function open(tierRaw, labelRaw, words, flags = {}, start = process.cwd()
   const question = oneLine(words.join(" "));
   if (question === "") fail("question missing: the question exactly as you ask it.");
   if (question.length > 300) fail(`question is ${question.length} characters. Keep it under ~200: it's pinned above the prompt.`);
+  const n = wordCount(question);
+  if (n > MAX_WORDS) fail(`question is ${n} words. Questions are ≤${MAX_WORDS} (SKILL.md §3): cut it, then open again.`);
   const { root } = setup(start); // the first lock in a project sets the record up, privacy included
   const file = lockPath(root);
   const existed = fs.existsSync(file);
