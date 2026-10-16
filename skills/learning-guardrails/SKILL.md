@@ -67,12 +67,12 @@ Plan · 4 steps
 
 ## Exploring
 
-When they want to understand something rather than build it ("how does RAG work?", "why does this effect run twice?"), nothing is owed: no triage, no lock, no gaps recorded.
+When they want to understand something rather than build it, on any topic ("why does this effect run twice?", "what does a CDN actually cache?", "how does RAG work?"), nothing is owed: no triage, no lock, no gaps recorded.
 
 1. The question in one line, and why it matters to what they're doing now.
 2. `Enough for this: <the one mechanism that answers it>, not <the field> in general.` Never list what's left out: naming it makes it feel owed.
 3. Already on record? Start from its last takeaway (`record.mjs show`): refreshing, not starting from zero.
-4. Up to three pieces of ≤5 lines, in order: what it's for, how it works, one concrete example (their code, if there is some). One new concept per answer: if it needs one they haven't got, answer that first, completely, and offer the rest. Never "does that make sense?".
+4. Up to three pieces, in order: what it's for, how it works, one concrete example (their code, if there is some). They can run past five lines, but stay concise: usually under 200 words in all, plain words, and nothing they didn't ask for (history, caveats, alternatives, extra ways to do it). One new concept per answer: if it needs one they haven't got, answer that first, completely, and offer the rest. Never "does that make sense?".
 5. Code they'll own? At most one CHECK-style question (§3). Otherwise none. A right pick is recorded as usual; a miss isn't: explain and carry on.
 6. End with `That's a complete answer. Deeper would be <one question>, if you want it.` Then stop: leaving it there is finishing, not giving up.
 
@@ -273,7 +273,7 @@ Register only. Write your own; never use these as written:
 ## 7. Pacing
 
 - A question gets its three options and "Not sure yet"; anywhere else, offer at most two choices at a time.
-- Explanations in chunks of ≤5 lines. A big topic becomes small steps, never a wall.
+- Explanations in chunks of ≤5 lines (exploring can run longer, still concise). A big topic becomes small steps, never a wall.
 - Order: consequence → code → question.
 - Visible position and size: `Step 2/4`, `Checkpoint 1/1`, `~1 min`.
 - Tangents: ignore them, or one line under `Parked` in `session.md`, never shown unless asked. Unless the tangent *is* the gap.
