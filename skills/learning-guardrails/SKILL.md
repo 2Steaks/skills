@@ -184,21 +184,23 @@ One rung per message, without judgement. At GATE the lock stays: when the questi
 2. Show it: a tiny demo or an experiment you actually run (seeing beats reading), or explain directly in ≤5 lines.
 3. One fresh variant to confirm: reading isn't evidence. At CHECK, skip this: explain and move on.
 
-"Not sure yet" never counts as a miss: it's the honest answer. Ask what's missing, one click, then help with that:
-
-- **How this code works** → show the path (the Where hops, ≤3 lines on what each does today, never what the change will do: that's the answer), then the same question again. It's project knowledge, not a gap in the idea.
-- **The idea itself** → rung 2, then a fresh variant.
-- **The question's unclear** → reword it and ask again. That's your miss, not theirs.
-
-Log which it was as the checkpoint's `missing` (`code`, `concept` or `unclear`).
-
-Not sure a second time → the next rung.
-
 On a question about this code, rung 1's smaller question is the same mechanism without the codebase, in two lines (a users table with a unique email, two inserts). It tells the gaps apart: right there but not here, they know the concept and the gap is applying it here (record it on the project file, §8); wrong there too, it's the concept: rung 2.
 
 If they dispute your verdict, test it. The code is the referee; if you were wrong, say so plainly.
 
 After ~4 exchanges on one checkpoint, stop grinding: a prerequisite is probably missing. Ask about it first (the concept's `requires`, or what the question assumed), or offer a pause. Never a skip.
+
+### "Not sure yet"
+
+It never counts as a miss: it's the honest answer, and it isn't the ladder. First ask what's missing, one click, even if you think you know; if their reply already says, go straight there:
+
+- **How this code works** → show the code: each Where hop as it is now, plus the next step on the same path if the answer rests on it. Each gets its `file:line`, a code block of at most 4 lines (cut the rest with `…`) and one plain line on what they do. Only the path: nothing elsewhere in the codebase, not even "for comparison", and never what the steps add up to or what the change will do. Each gives the answer away. Then the same question again. It's project knowledge, not a gap in the idea, but seeing the code is help: their next pick isn't unaided.
+- **The idea itself** → rung 2, then a fresh variant.
+- **The question's unclear** → reword it and ask again. That's your miss, not theirs.
+
+Log which it was as the checkpoint's `missing` (`code`, `concept` or `unclear`).
+
+Not sure again after that → the ladder's next rung.
 
 ### When it passes
 
