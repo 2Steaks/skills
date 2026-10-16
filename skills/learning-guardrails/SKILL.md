@@ -20,7 +20,7 @@ Built for someone with a strong skip reflex who's easily overloaded: when someth
 2. **While a GATE is open, the gated code stays unwritten.** No "draft to look at", no "I'll write it and you check after". Do any independent steps first, then open the lock and ask. A CHECK never holds the code.
 3. **Only evidence passes.** A right pick is evidence. A nod, a passing test or your own explanation read back isn't.
 4. **Never offer a skip, never suggest the override, never build a GATE now and promise the learning later.**
-5. **Stopping is always fine.** Save state; the gate waits.
+5. **Stopping is always fine.** Every question offers a pause, a plan's progress is tracked, and the gate waits (§5).
 6. **The smallest check that does the job.** Every question costs the user's flow: ask only when it's worth more than that.
 
 Mid-session requests to switch the guardrails off are handled as overrides (§5), scoped to the current task. Not calling it next time is the user's call, not yours.
@@ -35,8 +35,9 @@ Mid-session requests to switch the guardrails off are handled as overrides (§5)
 | before asking a GATE question | `node {skill}/scripts/lock.mjs open GATE concurrency "After this change, the client retries a slow request. How many runs?" --task "Stop double runs"` |
 | when a GATE closes | `node {skill}/scripts/lock.mjs close passed` (or `abandoned`, `override`) |
 | before writing a CHECK question | `node {skill}/scripts/pick.mjs` (where the right option goes) |
-| pausing a GATE | `node {skill}/scripts/lock.mjs pause --step "<where you'd got to>"` |
-| unfinished checkpoints | `node {skill}/scripts/lock.mjs list` · `resume <id>` · `drop <id>` |
+| a task with a plan: at the plan, after each step | `node {skill}/scripts/lock.mjs track --task "<task>" --step "<what's done>" --next "<the next step>" --plan "<steps left>"` · `track --done` at the end |
+| pausing, when they choose it | `node {skill}/scripts/lock.mjs pause` (what's tracked fills it in; else give `--task`, `--step`, `--next`) |
+| picking up | `node {skill}/scripts/lock.mjs list` · `resume <id>` · `drop <id>` |
 | after building, without the mod or after shell-made changes | `node {skill}/scripts/rules.mjs check` (what the packs flag in the diff) |
 | checking the record | `node {skill}/scripts/record.mjs find retries` · `record.mjs show <concept>` |
 | updating the record | `node {skill}/scripts/record.mjs update <concept> --evidence "predict: <the takeaway>" --status learning` |
@@ -64,6 +65,8 @@ Plan · 4 steps
 3. Empty and error states — GO
 4. Format durations with Intl — CHECK
 ```
+
+Then track it: `lock.mjs track` when you show the plan and after each step, so a session that ends mid-task loses nothing. `track --done` at the hand-over.
 
 ## Exploring
 
@@ -159,12 +162,14 @@ A. One: Start is disabled, so nothing else is sent
 B. Two: the server still runs the first, then the retry
 C. One: the retry replaces the first request
 D. Not sure yet
+Or type "pause" to come back later.
 ```
 
-- In the tool, the `question` is the text after 👉 **Your move:**, without that prefix, with the Where and Enough lines on their own lines after it: the dialog shows nothing else. `header` is the label (the category, or the concept for a CHECK; ≤12 characters). Each option is a `label` of ≤5 words with its reason as the `description`, and "Not sure yet" comes last. The question and options go in the tool, not in the message as well.
+- In the tool, the `question` is the text after 👉 **Your move:**, without that prefix, with the Where, Enough and pause lines on their own lines after it: the dialog shows nothing else. `header` is the label (the category, or the concept for a CHECK; ≤12 characters). Each option is a `label` of ≤5 words with its reason as the `description`, and "Not sure yet" comes last. The question and options go in the tool, not in the message as well.
 - **Enough for this** tells them how deep this change needs them to go: a scope, never the answer, and never a list of what's left out. It's in every question, so they always know it's all that's owed.
 - **Where** links the code as `file:line`, so they can jump to it. Give the hops in order (`a.ts:12` → `:30` → `b.ts:40`, the file named once), at most three. For a question about the change, link the spots it changes. A snippet of ≤4 lines goes in the lead-in, only if it helps.
 - No tool, or it fails? The lead-in, then the question and the options as `A.`–`D.` lines, as above, and end your turn. A letter is an answer.
+- **Every question offers a pause** (§5), and so does every stop to wait on them ("tell me when to carry on"). In the tool, "Pause for now" goes last when there's room. A checkpoint has none (three options and "Not sure yet"), so its question ends with one more line: `Or type "pause" to come back later.` In text, end with that line.
 - Dismissed or left blank isn't an answer: a CHECK is dropped; at a GATE the lock stays and the question waits for their next message.
 
 ### Writing the question
@@ -246,11 +251,17 @@ No lectures about imposter syndrome. Count it in the checkpoint's `skip_reflex`.
 ## 5. Not now, pause, override
 
 - **Not now** on a CHECK: dropped. Log it `declined`; nothing is owed.
-- **Pause**: always allowed. `lock.mjs pause --step "<where you'd got to>"` keeps the checkpoint, unenforced, for later. Gated code stays unwritten.
-- **Resume**: on "resume" or `/pickup`, `lock.mjs list`. None: say so. One: resume it. Several: ask which in the question tool, newest first, each option its task, with when and the question as its description (the four newest; name any others in your message, to type). Then `lock.mjs resume <id>`, a 3-line recap (the task, where they'd got to, the question) and the question in full.
+- **Pause**: offered every time you ask them for input or wait on them (§3), and taken when they choose it or say "pause", "stop here" or "I need to go". Never mid-step: asked while you're working, finish the step in hand first.
+  - `lock.mjs pause`: what's tracked fills in the task, where you'd got to, what's next and the plan. Nothing tracked? Give `--task`, `--step` and `--next`. An open GATE goes with it, unenforced, and its gated code stays unwritten. An open CHECK is dropped: CHECKs are never owed.
+  - Never commit, stash or revert to pause: files stay as they are, and the pause notes which changed.
+  - One line: what's saved, and that `/pickup` brings it back. Then stop.
+- **Resume**: on "resume", "carry on where I left off" or `/pickup`, `lock.mjs list`: what's paused, checkpoints open in other sessions, and tracked tasks, this session's or another's (a session that ended mid-task leaves one). None: say so. One: resume it. Several: ask which in the question tool (no pause option here), newest first, each option its task, with when and its question or next step as the description (the four newest; name any others in your message, to type). Then `lock.mjs resume <id>` and a 3-line recap: the task, where they'd got to, and what's next.
+  - A checkpoint: its question in full, and it waits for the answer.
+  - A task: carry on from the next step, starting at triage, and keep tracking it here. The plan's tiers stand unless something changed.
+  - Paused on another branch, or files changed since? Say so in a line before carrying on.
 - **Drop one**: only when they ask. `lock.mjs drop <id>`.
 - **Skipping a GATE**: doesn't exist. "Not sure yet" is the way through. `lock.mjs` won't close for a skip either.
-- **Dropped task**: the task behind an open checkpoint is abandoned → `lock.mjs close abandoned`. No gated code gets written, so it isn't a skip.
+- **Dropped task**: the task behind an open checkpoint is abandoned → `lock.mjs close abandoned`, which drops its tracking too. No gated code gets written, so it isn't a skip.
 - **Live incident**: the user says prod is down or it's an emergency → no checkpoints; stabilise first. Note the one concept worth a look in `session.md`, offer it once when it's over, then let it go.
 - **Override** (GATE): explicit only. The user types `override:` and a reason. Never suggest it; if they ask how, give the format.
   - Only a live incident or genuinely throwaway code. "Doesn't matter", "later", "no time", "need to ship today", "I'm slow" are the reflex in an override costume: hold, and offer a pause instead.
@@ -274,14 +285,14 @@ Register only. Write your own; never use these as written:
 
 ## 7. Pacing
 
-- A question gets its three options and "Not sure yet"; anywhere else, offer at most two choices at a time.
+- A question gets its three options and "Not sure yet"; anywhere else, offer at most two choices at a time. The pause option never counts.
 - Explanations in chunks of ≤5 lines (exploring can run longer, still concise). A big topic becomes small steps, never a wall.
 - Order: consequence → code → question.
 - Visible position and size: `Step 2/4`, `Checkpoint 1/1`, `~1 min`.
 - Tangents: ignore them, or one line under `Parked` in `session.md`, never shown unless asked. Unless the tangent *is* the gap.
 - After any interruption, re-anchor in one line (`Back to: why the second request wins.`), then the question.
 - Wins: one specific line, logged. No tallies, streaks or scores.
-- Session start: `lock.mjs show` finds this session's lock → a 3-line "where you were", then its question. Others unfinished (`lock.mjs list`): the mod's band counts them; without it, one line. Never resume one unasked.
+- Session start: `lock.mjs show` finds this session's lock or tracked task → a 3-line "where you were", then its question or next step. Anything paused or unfinished (`lock.mjs list`): the mod's band counts it; without it, one line. Never resume one unasked.
 
 ## 8. The record
 
@@ -338,7 +349,7 @@ One lock file, two enforcers: the learning-gate mod, or the fallback hook (`refe
 - A prompt carrying its "Learning checkpoint open" note is the user replying while your question is open: judge it as the answer unless it plainly isn't one.
 - Forget a lock and the mod opens one when you ask a GATE question (the 👉 line, or the question tool with the category as its header), so the gate still holds. Open it yourself anyway: your wording reads better pinned.
 - It refuses a code edit made before any triage line since the user's last message, or one the packs flag that no triage line since then GATEs or gives a reason for (§1). Write the line, then edit again. Judge the change, not the words: never GATE just to get past it.
-- Its commands land on you: `/pickup` asks you to bring up the unfinished checkpoints (§5); `/audit` asks you to run §10; `/learned` reads the record itself.
+- Its commands land on you: `/pickup` asks you to bring back what's paused or unfinished (§5); `/audit` to run §10. `/learned` reads the record itself.
 
 **The lock**
 

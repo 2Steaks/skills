@@ -154,6 +154,112 @@ test("pause keeps a checkpoint for later; another session lists it and picks it 
   assert.match(w.run("lock.mjs", ["list"], w.proj, "s3").out, /^s2 · open in another session/m);
 });
 
+test("a pause with no checkpoint open keeps the task; picking it up tracks it here, never a lock", () => {
+  const w = world();
+  const paused = w.run("lock.mjs", ["pause", "--task", "Add empty states", "--step", "step 2 of 4 built", "--next", "Error state for the runs list", "--plan", "3/4 Error state (GO) · 4/4 Durations (CHECK)"], w.proj, "s1");
+  assert.equal(paused.code, 0, paused.err);
+  assert.match(paused.out, /^paused as paused-\w+: Add empty states\. \/pickup, or lock\.mjs list, brings it back\.$/);
+  assert.equal(w.exists(".learning/locks/s1.lock"), false);
+  const listed = w.run("lock.mjs", ["list"], w.proj, "s2").out;
+  assert.match(listed, /^paused-\w+ · paused · just now · Add empty states$/m);
+  assert.match(listed, /^ {2}no checkpoint open$/m);
+  assert.match(listed, /^ {2}got to: step 2 of 4 built$/m);
+  assert.match(listed, /^ {2}next: Error state for the runs list$/m);
+  assert.match(listed, /^ {2}plan: 3\/4 Error state \(GO\) · 4\/4 Durations \(CHECK\)$/m);
+  const id = listed.match(/^(paused-\w+)/m)[1];
+  const resumed = w.run("lock.mjs", ["resume", id], w.proj, "s2");
+  assert.equal(resumed.code, 0, resumed.err);
+  assert.match(resumed.out, /tracked here: carry on from the next step/);
+  assert.equal(w.exists(".learning/locks/s2.lock"), false, "a task never locks");
+  assert.match(w.read(".learning/locks/s2.task"), /^next: Error state for the runs list$/m);
+  assert.equal(w.run("lock.mjs", ["track", "--done"], w.proj, "s2").out, "done: stopped tracking Add empty states");
+  assert.equal(w.run("lock.mjs", ["list"], w.proj, "s2").out, "none unfinished");
+});
+
+test("track keeps a plan's progress; another session sees it if this one ends; done clears it", () => {
+  const w = world();
+  const t = w.run("lock.mjs", ["track", "--task", "Three RunPanel changes", "--step", "1/3 heading done", "--next", "2/3 empty state", "--plan", "2/3 Empty state (GO) · 3/3 Error message (GATE)"], w.proj, "s1");
+  assert.equal(t.code, 0, t.err);
+  assert.equal(t.out, "tracking (this session): Three RunPanel changes · next: 2/3 empty state");
+  assert.equal(w.run("lock.mjs", ["show"], w.proj, "s1").out, "none in this session\ntracking: Three RunPanel changes · next: 2/3 empty state");
+  assert.match(w.run("lock.mjs", ["list"], w.proj, "s1").out, /^s1\.task · tracked in this session · just now · Three RunPanel changes$/m, "a continued session finds its own task");
+  assert.match(w.run("lock.mjs", ["resume", "s1.task"], w.proj, "s1").out, /tracked here/);
+  assert.ok(w.exists(".learning/locks/s1.task"), "resuming your own task leaves it where it is");
+  assert.match(w.run("lock.mjs", ["list"], w.proj, "s2").out, /^s1\.task · tracked in another session · just now · Three RunPanel changes$/m);
+  w.run("lock.mjs", ["track", "--step", "2/3 done", "--next", "3/3 error message"], w.proj, "s1");
+  const file = w.read(".learning/locks/s1.task");
+  assert.match(file, /^task: Three RunPanel changes$/m);
+  assert.match(file, /^next: 3\/3 error message$/m);
+  assert.match(file, /^plan: 2\/3 Empty state \(GO\) · 3\/3 Error message \(GATE\)$/m);
+  const picked = w.run("lock.mjs", ["resume", "s1.task"], w.proj, "s2");
+  assert.match(picked.out, /tracked here: carry on from the next step/);
+  assert.equal(w.exists(".learning/locks/s1.task"), false);
+  assert.ok(w.exists(".learning/locks/s2.task"));
+  assert.equal(w.exists(".learning/locks/s2.lock"), false);
+  assert.equal(w.run("lock.mjs", ["track", "--done"], w.proj, "s2").out, "done: stopped tracking Three RunPanel changes");
+  assert.equal(w.run("lock.mjs", ["track", "--done"], w.proj, "s2").out, "nothing was tracked");
+  assert.match(w.run("lock.mjs", ["track", "--next", "x"], w.proj, "s3").err, /--task/);
+});
+
+test("a pause takes what's tracked; picking it up locks the checkpoint and tracks the task; abandoning drops both", () => {
+  const w = world();
+  w.run("lock.mjs", ["track", "--task", "Safe removal", "--step", "1/2 tests written", "--next", "2/2 unique rule"], w.proj, "s1");
+  w.run("lock.mjs", ["open", "GATE", "data", "After this change, how many rows?", "--task", "Safe removal"], w.proj, "s1");
+  const paused = w.run("lock.mjs", ["pause"], w.proj, "s1");
+  assert.equal(paused.code, 0, paused.err);
+  assert.equal(w.exists(".learning/locks/s1.lock") || w.exists(".learning/locks/s1.task"), false);
+  const id = paused.out.match(/paused as (paused-\w+)/)[1];
+  const kept = w.read(`.learning/locks/${id}.lock`);
+  assert.equal(kept.split("\n")[0], "GATE · data · After this change, how many rows?");
+  assert.match(kept, /^step: 1\/2 tests written$/m);
+  assert.match(kept, /^next: 2\/2 unique rule$/m);
+  assert.match(w.run("lock.mjs", ["resume", id], w.proj, "s2").out, /locked: re-ask its question/);
+  assert.ok(w.exists(".learning/locks/s2.lock") && w.exists(".learning/locks/s2.task"));
+  assert.match(w.run("lock.mjs", ["close", "abandoned"], w.proj, "s2").out, /unlocked \(abandoned\)/);
+  assert.equal(w.exists(".learning/locks/s2.lock") || w.exists(".learning/locks/s2.task"), false);
+});
+
+test("a pause needs the task and somewhere to pick up from", () => {
+  const w = world();
+  assert.match(w.run("lock.mjs", ["pause", "--step", "halfway"]).err, /--task/);
+  assert.match(w.run("lock.mjs", ["pause", "--task", "Add empty states"]).err, /--step\) or what comes next \(--next\)/);
+  assert.match(w.run("lock.mjs", ["pause", "--task", "x".repeat(121), "--next", "y"]).err, /--task: keep it under 120/);
+  assert.equal(w.exists(".learning/locks"), false, "nothing written on a refusal");
+});
+
+test("pausing with a checkpoint open keeps the next step and plan; picking it up locks again", () => {
+  const w = world();
+  w.run("lock.mjs", ["open", "GATE", "data", "After this change, how many rows?", "--task", "Safe removal"], w.proj, "s1");
+  const paused = w.run("lock.mjs", ["pause", "--step", "asked the GATE question", "--next", "Add the unique rule", "--plan", "2/3 Migration (GATE)"], w.proj, "s1");
+  assert.match(paused.out, /\(its checkpoint too\)/);
+  const id = paused.out.match(/paused as (paused-\w+)/)[1];
+  const resumed = w.run("lock.mjs", ["resume", id], w.proj, "s2");
+  assert.match(resumed.out, /locked: re-ask its question/);
+  const lock = w.read(".learning/locks/s2.lock");
+  assert.equal(lock.split("\n")[0], "GATE · data · After this change, how many rows?");
+  assert.match(lock, /^next: Add the unique rule$/m);
+  assert.match(lock, /^plan: 2\/3 Migration \(GATE\)$/m);
+});
+
+test("a pause notes uncommitted files and the branch, and pickup says when the branch has changed", () => {
+  const w = world();
+  const git = (...args) => execFileSync("git", ["-C", w.proj, "-c", "user.email=t@t", "-c", "user.name=t", ...args], { encoding: "utf8" });
+  fs.writeFileSync(path.join(w.proj, "src", "a.ts"), "export const a = 1\n");
+  git("add", "-A");
+  git("commit", "-qm", "init");
+  git("checkout", "-qb", "feat");
+  fs.writeFileSync(path.join(w.proj, "src", "a.ts"), "export const a = 2\n");
+  const paused = w.run("lock.mjs", ["pause", "--task", "Bump a", "--next", "Test it"]);
+  assert.equal(paused.code, 0, paused.err);
+  assert.equal(git("status", "--porcelain").trim(), "M src/a.ts", "the pause never stashes or commits");
+  const listed = w.run("lock.mjs", ["list"], w.proj, "s2").out;
+  assert.match(listed, /^ {2}changed: src\/a\.ts$/m);
+  assert.match(listed, /^ {2}branch: feat$/m);
+  git("checkout", "-qb", "other");
+  const id = listed.match(/^(paused-\w+)/m)[1];
+  assert.match(w.run("lock.mjs", ["resume", id], w.proj, "s2").out, /note: paused on branch feat; you're on other/);
+});
+
 test("list shows other sessions' open checkpoints, newest first; resume and drop take ids", () => {
   const w = world();
   w.run("lock.mjs", ["open", "GATE", "data", "Older question?", "--task", "Older task"], w.proj, "s1");

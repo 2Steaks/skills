@@ -366,7 +366,7 @@ describe('opt-in', () => {
     expect((await $.tool.call(edit('/proj/src/a.ts'))).deny).toBeUndefined()
     for (const surface of SURFACES) {
       const ui = await $.ui.mount({ ...BAND, surface })
-      expect((await ui.find({ type: 'Text', text: 'unfinished' }))?.text).toBe('⏸ 1 unfinished checkpoint · /pickup to carry on')
+      expect((await ui.find({ type: 'Text', text: 'unfinished' }))?.text).toBe('⏸ 1 paused or unfinished · /pickup to carry on')
       await ui.unmount()
     }
   })
@@ -382,7 +382,7 @@ describe('opt-in', () => {
     await $.tool.call({ tool: 'Bash', command: 'node lock.mjs close passed' })
     for (const surface of SURFACES) {
       const ui = await $.ui.mount({ ...BAND, surface })
-      expect((await ui.find({ type: 'Text', text: 'unfinished' }))?.text).toBe('⏸ 2 unfinished checkpoints · /pickup to carry on')
+      expect((await ui.find({ type: 'Text', text: 'unfinished' }))?.text).toBe('⏸ 2 paused or unfinished · /pickup to carry on')
       await ui.unmount()
     }
   })
@@ -398,11 +398,39 @@ describe('opt-in', () => {
     await $.command.run(command('pickup'))
     await new Promise(r => setTimeout(r, 0))
     expect(ran).toHaveLength(1)
-    expect(ran[0]?.args).toContain('Pick up an unfinished learning checkpoint')
+    expect(ran[0]?.args).toContain('Pick up paused or unfinished work')
     expect((await $.tool.call({ tool: 'Skill', skill: 'learning-guardrails' } as never)).deny).toBeUndefined()
     const after = refusal(await $.tool.call(edit('/proj/src/a.ts')))
     expect(after).toContain('Re-ask the question, options and all')
     expect(after).toContain(QUESTION)
+  })
+
+  test('a paused task never holds edits, and the band counts it', async ($, on) => {
+    world(on, { '/proj/.learning/locks/paused-abc.lock': 'TASK · work · Add the error state\ntask: Empty states\n' })
+    on('prompt.submit', ($, e) => ({ text: e.text }))
+    await $.skill.prompt({ skill: 'learning-guardrails', text: 'the skill' })
+    await $.prompt.submit(prompt('carry on'))
+    await append($, reply('Guardrail · GO · error state copy', 'r11'))
+    expect((await $.tool.call(edit('/proj/src/a.ts'))).deny).toBeUndefined()
+    for (const surface of SURFACES) {
+      const ui = await $.ui.mount({ ...BAND, surface })
+      expect((await ui.find({ type: 'Text', text: 'paused or unfinished' }))?.text).toBe('⏸ 1 paused or unfinished · /pickup to carry on')
+      await ui.unmount()
+    }
+  })
+
+  test("another session's tracked task is counted for /pickup; this session's own isn't", async ($, on) => {
+    world(on, {
+      '/proj/.learning/locks/sess-0.task': 'TASK · work · 2/3 empty state\ntask: RunPanel changes\n',
+      [`/proj/.learning/locks/${SESSION}.task`]: 'TASK · work · mine\ntask: Mine\n',
+    })
+    on('prompt.submit', ($, e) => ({ text: e.text }))
+    await $.prompt.submit(prompt('hello'))
+    for (const surface of SURFACES) {
+      const ui = await $.ui.mount({ ...BAND, surface })
+      expect((await ui.find({ type: 'Text', text: 'paused or unfinished' }))?.text).toBe('⏸ 1 paused or unfinished · /pickup to carry on')
+      await ui.unmount()
+    }
   })
 
   test('/pickup falls back to a plain prompt when the skill command is missing', async ($, on) => {
@@ -415,7 +443,7 @@ describe('opt-in', () => {
     })
     await $.command.run(command('pickup'))
     await new Promise(r => setTimeout(r, 0))
-    expect(asked.at(-1)).toContain('Pick up an unfinished learning checkpoint')
+    expect(asked.at(-1)).toContain('Pick up paused or unfinished work')
   })
 
   test('the standing rule says opt-in', async ($, on) => {
