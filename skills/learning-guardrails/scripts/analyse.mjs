@@ -74,7 +74,9 @@ export function report(events, concepts, { bad = 0, misses = null } = {}) {
   out.push("");
 
   out.push("## Learning, not compliance");
-  out.push(`- unaided passes: ${passed.filter((e) => e.help === 0).length} of ${passed.length} (${pct(passed.filter((e) => e.help === 0).length, passed.length)})`);
+  // A "not sure yet" only stays unaided when the question was the problem; seeing the code or the idea is help.
+  const unaided = passed.filter((e) => e.help === 0 && (!e.missing || e.missing === "unclear")).length;
+  out.push(`- unaided passes: ${unaided} of ${passed.length} (${pct(unaided, passed.length)})`);
   out.push(`- evidence: ${show(tally(passed.map((e) => e.evidence ?? "unrecorded")))}`);
   const repeats = checkpoints.filter((e) => e.status_before === "demonstrated" && e.new_knowledge === false);
   out.push(`- repeat teaching (demonstrated, nothing new): ${repeats.length ? show(tally(repeats.flatMap((e) => e.concepts ?? ["?"]))) : "none"}`);

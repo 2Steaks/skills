@@ -288,6 +288,17 @@ test("log: a reworded question isn't a ladder rung, and the audit counts it", ()
   assert.match(out, /unaided passes: 1 of 1/);
 });
 
+test("analyse: a pass after seeing the code isn't unaided; after an unclear question it is", () => {
+  const w = world();
+  for (const [task, missing] of [["t1", "code"], ["t2", "unclear"], ["t3", "concept"]]) {
+    const r = w.run("log.mjs", ["checkpoint", JSON.stringify({ task, tier: "gate", outcome: "passed", help: 0, missing })]);
+    assert.equal(r.code, 0, r.err);
+  }
+  const out = w.run("analyse.mjs").out;
+  assert.match(out, /unaided passes: 1 of 3/);
+  assert.match(out, /not sure, and what was missing: .*code 1/);
+});
+
 test("architecture is logged and reported, but has no rule patterns", () => {
   const w = world();
   const logged = w.run("log.mjs", ["checkpoint", JSON.stringify({ task: "t1", tier: "gate", outcome: "passed", cats: ["architecture"], concepts: ["url-state"], evidence: "explain", help: 0 })]);
