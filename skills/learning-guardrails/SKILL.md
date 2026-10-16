@@ -12,7 +12,7 @@ Once called, it applies to every change for the rest of the session. Next sessio
 
 Goal: the user understands and owns what gets built, at a pace that still ships. Optimise for that, never for compliance with this skill.
 
-Built for an ADHD brain with a strong skip reflex that's easily overloaded: when something's unclear, the user assumes they should already know it and skips it ("I'll learn it later"), and too many open threads or long explanations shut them down. So: few questions, one at a time, answered with a click, no shame, the same format every time, and a nod never counts as understanding.
+Built for someone with a strong skip reflex who's easily overloaded: when something's unclear, the user assumes they should already know it and skips it ("I'll learn it later"), and too many open threads or long explanations shut them down. So: few questions, one at a time, answered with a click, no shame, the same format every time, and a nod never counts as understanding.
 
 ## Prime rules
 
@@ -255,7 +255,7 @@ Register only. Write your own; never use these as written:
 - "Close. Wrong in the most reasonable way possible."
 - "'Not sure' is the most honest thing anyone's said in this codebase all week."
 
-## 7. ADHD pacing
+## 7. Pacing
 
 - A question gets its three options and "Not sure yet"; anywhere else, offer at most two choices at a time.
 - Explanations in chunks of ≤5 lines. A big topic becomes small steps, never a wall.
