@@ -32,7 +32,7 @@ Mid-session requests to switch the guardrails off are handled as overrides (§5)
 | When | Run |
 | --- | --- |
 | every session, before anything else | `node {skill}/scripts/setup.mjs` |
-| before asking a GATE question | `node {skill}/scripts/lock.mjs open GATE concurrency "Two clicks within 200ms: how many runs?" --task "Stop double runs"` |
+| before asking a GATE question | `node {skill}/scripts/lock.mjs open GATE concurrency "After this change, the client retries a slow request. How many runs?" --task "Stop double runs"` |
 | when a GATE closes | `node {skill}/scripts/lock.mjs close passed` (or `abandoned`, `override`) |
 | before writing a CHECK question | `node {skill}/scripts/pick.mjs` (where the right option goes) |
 | pausing a GATE | `node {skill}/scripts/lock.mjs pause --step "<where you'd got to>"` |
@@ -152,24 +152,26 @@ Write the lead-in as text first, in the same reply: the triage line, the checkpo
 Guardrail · GATE · concurrency: request race
 Checkpoint 1/1 · ~1 min · concurrency
 Why it matters: people double-click, and each run is paid work.
-👉 **Your move:** Start is clicked twice, 200ms apart, before the first request returns. How many runs exist?
-Where: `src/RunPanel.tsx:14` click → `src/api/startRun.ts:8` POST
+👉 **Your move:** After this change, Start is disabled until the request returns. The server replies slowly, so the client retries. How many runs exist?
+Where: `src/RunPanel.tsx:14` Start button → `src/api/startRun.ts:8` POST
 Enough for this: this one race, not concurrency in general.
-A. One: the second click waits for the first
-B. Two: nothing stops the second request
-C. One: the second replaces the first
+A. One: Start is disabled, so nothing else is sent
+B. Two: the server still runs the first, then the retry
+C. One: the retry replaces the first request
 D. Not sure yet
 ```
 
 - In the tool, the `question` is the text after 👉 **Your move:**, without that prefix, with the Where and Enough lines on their own lines after it: the dialog shows nothing else. `header` is the label (the category, or the concept for a CHECK; ≤12 characters). Each option is a `label` of ≤5 words with its reason as the `description`, and "Not sure yet" comes last. The question and options go in the tool, not in the message as well.
 - **Enough for this** tells them how deep this change needs them to go: a scope, never the answer, and never a list of what's left out. It's in every question, so they always know it's all that's owed.
-- **Where** links the code as `file:line`, so they can jump to it. Give the hops in order (`a.ts:12` → `:30` → `b.ts:40`, the file named once), at most three. A snippet of ≤4 lines goes in the lead-in, only if it helps.
+- **Where** links the code as `file:line`, so they can jump to it. Give the hops in order (`a.ts:12` → `:30` → `b.ts:40`, the file named once), at most three. For a question about the change, link the spots it changes. A snippet of ≤4 lines goes in the lead-in, only if it helps.
 - No tool, or it fails? The lead-in, then the question and the options as `A.`–`D.` lines, as above, and end your turn. A letter is an answer.
 - Dismissed or left blank isn't an answer: a CHECK is dropped; at a GATE the lock stays and the question waits for their next message.
 
 ### Writing the question
 
 - **≤25 words**, and it makes sense without the lead-in, since the dialog and the pinned band show it alone: what happens, in order, then the one thing to predict. Won't fit? It's two questions: ask the one that matters. Count before you ask: `lock.mjs open` refuses a GATE question that's over.
+- **Ask about the decision being made**: what the change will do, or what it trades off. That's the code they'll own. The code before the change comes in only as the reason for it.
+- **Name the version** in the question: "before this change", "after this change", or an approach you won't take, named as one ("if it checked first instead"). A question about the change says what the change is. A CHECK comes after the build, so it asks about the code after the change.
 - First, list what the question and lead-in assume: names, syntax, other code, other concepts. Another concept the answer needs: `record.mjs find` it; not on record, ask about that first, as its own question.
 - Never lean on code they haven't seen. State the codebase facts the answer rests on as what they mean (`@@unique([eventId, personId])` is "only one row per event and person"), or show them: a hop, a snippet. If it hinges on one line (`create`, not `upsert`), that line is a hop.
 - Nothing from elsewhere in the codebase, in the question, the Where line or the lead-in, unless the project record shows they know it. "An RSVP already has this rule" is a hint and a second question.
@@ -179,7 +181,7 @@ D. Not sure yet
 - Plain and literal, as you'd ask a colleague out loud. Say what this codebase's things are ("a removal", "a guest"), not what the code calls them: model, column and function names and framework syntax go in the Where line. A language or library API the question is about (`useEffect`, `Promise.all`) can be named. No metaphors or nicknames ("the orphan row"), no form labels ("Break it:"), no jargon the question doesn't need.
 - One concept. Ask what you'd observe (what's saved, sent or shown), not what something is called.
 - ≤120 words before the question: what's at stake, for whom, without giving the answer away. Real code from this change, one scenario: not a textbook example, not three.
-- Good forms: predict ("what happens when…"), break it ("what fails if we remove X?"), choose ("A or B here: what do we give up?"), spot ("which line goes wrong on a slow network?", with the lines as options).
+- Good forms: predict ("after this change, what happens when…"), break it ("what fails if the change leaves out X?"), choose ("A or B for this change: what do we give up?"), spot ("which line of the change goes wrong on a slow network?", with the lines as options).
 - Re-asking, after anything: the question in full, options and all. Never "see above".
 - Clarifying questions are learning, not stalling: answer in ≤3 lines, then re-ask. One about the code or the wording means the question assumed too much: reword it before re-asking. Their next right pick still counts as unaided; log `reworded`.
 - Never ask "does that make sense?" or "any questions?". They invite a nod.
@@ -220,7 +222,7 @@ Not sure again after that → the ladder's next rung.
 ### When it passes
 
 `lock.mjs close passed` for a GATE, one specific line on the mechanism plus any qualification that matters, then build immediately. No ceremony, no praise.
-`Yes. Nothing stops the second request, so both run and the second overwrites the first. Logged. Building.`
+`Yes. Disabling Start stops a double-click, not a retry: the server runs both. Retries are the next step. Logged. Building.`
 
 Record it: `record.mjs update <concept> --evidence "<type>: <the takeaway their pick shows, one line they could relearn it from>"`, with `--unaided` whenever they got it first time with no hint, a GATE's first pick included. The type comes from the question's form: `predict` for predict and break it, `explain` for choose, `debug` for spot, or `experiment` and `transfer` when that's what they did. Status:
 
