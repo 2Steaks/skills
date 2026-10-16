@@ -26,6 +26,8 @@ They're built to go together: the skill decides when to stop, the mod makes sure
 
 It checks the design as well as the code: a decision later code will build on (a new datastore, a framework, the first global store) gets its own checkpoint before step 1. Pick differently, with a sound reason, and the plan changes.
 
+Ask it how something works and it answers one piece at a time, says what's enough for now and stops at a complete answer. No gates, and nothing left owed.
+
 The skill's risk signals cover JS/TS (React, Vue, Svelte, Angular, Node), Python, Go, Ruby, Java/Kotlin, C#, PHP, Rust, Swift and infra (Terraform, Kubernetes, Docker, CI). Adding a stack is one file: see [the rule packs](skills/learning-guardrails/assets/rules).
 
 ```
