@@ -21,7 +21,7 @@ Optimise for learning, retained understanding, engineering independence and usef
   - with `--git`, commits that carry GATE signals on a day with no gate: possible misses for review
 - `scripts/bench.mjs [--rules <file>] [--cases <file>] [--proposed <file>]` runs the benchmark cases against the triage rules, the record logic and the override policy. `--rules` and `--proposed` put one more file on top of the rules in force: a pack, a layer or an old full copy. With `--proposed` it lists every case that became **more permissive** (risk under-tiered, a needed check dropped) or **more intrusive** (GO over-tiered, a mastered concept retaught), and fails if any case's expectation breaks.
 
-Both are deterministic: no network, randomness or AI. Subjective questions (does this checkpoint force reasoning?) get explicit criteria instead: its options carry their reasons and its wrong options are real misconceptions, it's tied to the real code, it asks one question, it leans on nothing they'd have to already know about this codebase, and it can't be passed with a nod. Review against real examples, not another model's opinion alone.
+Both are deterministic: no network, randomness or AI. Subjective questions (does this checkpoint force reasoning?) get explicit criteria instead: its options carry their reasons and its wrong options are real misconceptions, it's tied to the real code and asks about the change being made, saying which version it means, it asks one question, it leans on nothing they'd have to already know about this codebase, and it can't be passed with a nod. Review against real examples, not another model's opinion alone.
 
 ## Rules and cases
 
