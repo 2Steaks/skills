@@ -4,8 +4,9 @@
 // The skill writes .learning/locks/<session id>.lock (first line: `TIER · category ·
 // question`) right before it asks a GATE question, and deletes it when the user passes,
 // drops the task, or gives a valid override; a pause keeps it under another name for
-// /pickup. Each session is held only by its own lock, so sessions never block each
-// other; the band counts the others. While this session's lock exists:
+// /pickup. A task with a plan is tracked in <session>.task, which never locks, so a session
+// that ends mid-task can be picked up. Each session is held only by its own lock, so sessions
+// never block each other; the band counts what's paused, open or tracked elsewhere. While this session's lock exists:
 // - code edits are refused, with the open question as the reason;
 // - the question is pinned above the prompt;
 // - every prompt carries it to the model, so it survives a compacted context.
@@ -60,7 +61,7 @@ const RULES = {
 } as const
 
 const PICKUP =
-  'Pick up an unfinished learning checkpoint, per the learning-guardrails skill: list them, ask me which if there is more than one, then a three-line recap and the question in full.'
+  'Pick up paused or unfinished work, per the learning-guardrails skill: list it, ask me which if there is more than one, then a three-line recap, and the checkpoint\'s question in full or the next step.'
 const AUDIT = 'Audit the learning guardrails, per section 10 of the learning-guardrails skill.'
 
 export const register: Register = on => {
@@ -68,7 +69,7 @@ export const register: Register = on => {
     await tellShells($)
     await Promise.all([
       $.command.register({ name: 'learned', description: 'Show what your learning record says you have demonstrated' }),
-      $.command.register({ name: 'pickup', description: 'Pick up an unfinished learning checkpoint, from a menu when there are several' }),
+      $.command.register({ name: 'pickup', description: 'Pick up paused or unfinished work, from a menu when there are several' }),
       $.command.register({ name: 'audit', description: 'Audit the learning guardrails against their own logs' }),
     ])
     await refresh($)
@@ -200,7 +201,7 @@ export const register: Register = on => {
 
       return (
         <Text dimColor wrap="wrap">
-          ⏸ {others} unfinished checkpoint{others === 1 ? '' : 's'} · /pickup to carry on
+          ⏸ {others} paused or unfinished · /pickup to carry on
         </Text>
       )
     }
@@ -219,7 +220,7 @@ export const register: Register = on => {
           🛑 Checkpoint open · {label(lock)}
         </Text>
         <Text wrap="wrap">{lock.question}</Text>
-        <Text dimColor>Answer below. You can stop; you can't skip.</Text>
+        <Text dimColor>Answer below, or type pause to come back later. You can stop; you can't skip.</Text>
       </Box>
     )
   })
@@ -299,15 +300,17 @@ async function tellShells($: Engine): Promise<void> {
   }
 }
 
-// Checkpoints left in this project by other sessions or paused: /pickup's menu.
+// Work paused in this project, checkpoints open in other sessions, and tasks other sessions
+// were tracking (one that ended mid-task leaves its .task): /pickup's menu.
 async function countUnfinished($: Engine): Promise<number> {
   try {
     const root = await projectRecord($)
     if (root === null) return 0
-    const own = (await ownLock($)).slice('locks/'.length)
+    const id = await sessionId($)
+    const mine = new Set([`${id}.lock`, `${id}.task`])
     const dir = join(root, 'locks')
     const locks = (await $.fs.exists(dir))
-      ? (await $.fs.list(dir)).filter(f => f.kind === 'file' && f.name.endsWith('.lock') && f.name !== own).length
+      ? (await $.fs.list(dir)).filter(f => f.kind === 'file' && /\.(lock|task)$/.test(f.name) && !mine.has(f.name)).length
       : 0
 
     return locks + ((await $.fs.exists(join(root, 'gate.lock'))) ? 1 : 0)
